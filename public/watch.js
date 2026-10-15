@@ -79,15 +79,21 @@ function renderWatch(nextState) {
   watchElement("watchRemainingPairs").textContent = watchState.remainingPairs;
   const current = watchState.players.find((player) => player.id === watchState.currentPlayerId);
   watchElement("watchTurnName").textContent = current ? `${current.name}の番` : "-";
+  watchElement("watchCurrentTurnStatus").textContent = `現在のターン：${current?.name || "-"}`;
+  watchElement("watchTurnInstruction").textContent = watchState.isProcessing
+    ? "カードを判定しています…"
+    : current ? `${current.name}さんが2枚選んでいます` : "次のターンを待っています";
   renderWatchPlayers();
 
   const status = watchElement("watchStatus");
   if (watchState.status === "waiting") {
     status.textContent = `ゲーム開始を待っています（${watchState.players.length}人参加中）`;
     status.classList.remove("hidden", "error");
+    watchElement("watchProgress").classList.add("hidden");
     watchElement("watchCardGrid").replaceChildren();
   } else {
     status.classList.add("hidden");
+    watchElement("watchProgress").classList.toggle("hidden", watchState.status !== "playing");
     renderWatchCards();
   }
 

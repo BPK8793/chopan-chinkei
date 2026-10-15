@@ -50,20 +50,31 @@ function renderLobby() {
     }
     return row;
   }));
-  const canStart = isHost() && state.players.filter((p) => p.connected).length >= 2;
+  const showStart = state.status === "waiting" && isHost();
+  const canStart = showStart && state.players.filter((p) => p.connected).length >= 2;
   $("startButton").disabled = !canStart;
-  $("startButton").classList.toggle("hidden", !isHost());
-  $("startHint").textContent = isHost()
+  $("startButton").classList.toggle("hidden", !showStart);
+  $("startHint").textContent = showStart
     ? (canStart ? "準備ができたらスタート！" : "あと1人で開始できます")
     : "ルーム作成者の開始を待っています";
 }
 
 function renderGame() {
   showScreen($("gameScreen"));
+  $("gameProgress").classList.toggle("hidden", state.status !== "playing");
   $("gameRoomCode").textContent = state.roomId;
   $("remainingPairs").textContent = state.remainingPairs;
   const current = state.players.find((player) => player.id === state.currentPlayerId);
-  $("turnName").textContent = current ? `${current.id === socket.id ? "あなた" : current.name}の番` : "-";
+  const currentName = current ? (current.id === socket.id ? "あなた" : current.name) : "-";
+  $("turnName").textContent = current ? `${currentName}の番` : "-";
+  $("currentTurnStatus").textContent = `現在のターン：${currentName}`;
+  if (state.isProcessing) {
+    $("turnInstruction").textContent = "カードを判定しています…";
+  } else if (current?.id === socket.id) {
+    $("turnInstruction").textContent = `2枚選んでください（${state.selectedCards.length}/2）`;
+  } else {
+    $("turnInstruction").textContent = current ? `${current.name}さんが2枚選んでいます` : "次のターンを待っています";
+  }
 
   $("playersBar").replaceChildren(...state.players.map((player) => {
     const chip = document.createElement("div");
@@ -141,6 +152,10 @@ function renderResults() {
 
 function applyState(next) {
   state = next;
+  if (state.status !== "waiting") {
+    $("startButton").classList.add("hidden");
+    $("startButton").disabled = true;
+  }
   if (state.status === "waiting") {
     $("resultModal").classList.add("hidden");
     renderLobby();
@@ -159,7 +174,11 @@ socket.on("connect_error", () => $("connectionBanner").classList.remove("hidden"
   "roomCreated", "roomUpdated", "gameStarted", "cardFlipped", "pairMatched",
   "pairFailed", "turnChanged", "jokerActivated", "gameEnded"
 ].forEach((event) => socket.on(event, applyState));
-socket.on("errorMessage", ({ message }) => showToast(message));
+socket.on("errorMessage", ({ message }) => {
+  showToast(message);
+  // 開始要求が拒否された場合は、最新の待機状態に合う表示へ戻す。
+  if (state?.status === "waiting") renderLobby();
+});
 
 $("createButton").addEventListener("click", () => socket.emit("createRoom", { name: saveName() }));
 $("joinButton").addEventListener("click", () => socket.emit("joinRoom", { name: saveName(), roomId: $("roomInput").value }));
@@ -183,7 +202,13 @@ $("watchButton").addEventListener("click", () => {
   }
   window.location.assign(`/watch/${roomId}`);
 });
-$("startButton").addEventListener("click", () => socket.emit("startGame"));
+$("startButton").addEventListener("click", () => {
+  // 二重送信を防ぎ、サーバーからの開始通知を待つ間もボタンを残さない。
+  $("startButton").classList.add("hidden");
+  $("startButton").disabled = true;
+  $("startHint").textContent = "ゲームを開始しています…";
+  socket.emit("startGame");
+});
 $("leaveRoomButton").addEventListener("click", () => { socket.emit("leaveRoom"); state = null; showScreen($("homeScreen")); });
 $("copyRoomButton").addEventListener("click", async () => {
   try { await navigator.clipboard.writeText(state.roomId); showToast("ルーム番号をコピーしました"); }
