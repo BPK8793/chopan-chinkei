@@ -255,7 +255,7 @@ function createApplication(options = {}) {
       }
       const room = rooms.get(roomId);
       if (!room) {
-        return socket.emit("watchUnavailable", { message: "ルームが存在しないか、すでに終了しています" });
+        return socket.emit("watchUnavailable", { message: "ルームが見つかりません" });
       }
       if (socket.data.watchRoomId) socket.leave(`watch:${socket.data.watchRoomId}`);
       socket.data.isWatcher = true;

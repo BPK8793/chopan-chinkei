@@ -163,8 +163,26 @@ socket.on("errorMessage", ({ message }) => showToast(message));
 
 $("createButton").addEventListener("click", () => socket.emit("createRoom", { name: saveName() }));
 $("joinButton").addEventListener("click", () => socket.emit("joinRoom", { name: saveName(), roomId: $("roomInput").value }));
-$("roomInput").addEventListener("input", (event) => { event.target.value = event.target.value.replace(/\D/g, "").slice(0, 4); });
+function normalizeRoomInput(event) {
+  event.target.value = event.target.value.replace(/\D/g, "").slice(0, 4);
+}
+
+$("roomInput").addEventListener("input", normalizeRoomInput);
 $("roomInput").addEventListener("keydown", (event) => { if (event.key === "Enter") $("joinButton").click(); });
+$("watchRoomInput").addEventListener("input", (event) => {
+  normalizeRoomInput(event);
+  $("watchInputError").classList.add("hidden");
+});
+$("watchRoomInput").addEventListener("keydown", (event) => { if (event.key === "Enter") $("watchButton").click(); });
+$("watchButton").addEventListener("click", () => {
+  const roomId = $("watchRoomInput").value.trim();
+  if (!/^\d{4}$/.test(roomId)) {
+    $("watchInputError").textContent = "4桁のルームコードを入力してください";
+    $("watchInputError").classList.remove("hidden");
+    return;
+  }
+  window.location.assign(`/watch/${roomId}`);
+});
 $("startButton").addEventListener("click", () => socket.emit("startGame"));
 $("leaveRoomButton").addEventListener("click", () => { socket.emit("leaveRoom"); state = null; showScreen($("homeScreen")); });
 $("copyRoomButton").addEventListener("click", async () => {

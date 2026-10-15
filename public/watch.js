@@ -2,6 +2,7 @@
 
 const watchSocket = io();
 const watchRoomId = decodeURIComponent(location.pathname.split("/").filter(Boolean)[1] || "");
+const isObsMode = new URLSearchParams(location.search).get("obs") === "1";
 let watchState = null;
 let watchRevealInterval = null;
 
@@ -105,6 +106,12 @@ function joinWatchRoom() {
   watchElement("watchRoomCode").textContent = watchRoomId || "----";
   watchSocket.emit("joinWatch", { roomId: watchRoomId });
 }
+
+document.body.classList.toggle("obs-mode", isObsMode);
+watchElement("openObsButton").addEventListener("click", () => {
+  const obsUrl = `/watch/${encodeURIComponent(watchRoomId)}?obs=1`;
+  window.open(obsUrl, "_blank", "noopener");
+});
 
 watchSocket.on("connect", joinWatchRoom);
 watchSocket.on("disconnect", () => {

@@ -214,3 +214,20 @@ test("watchers are read-only, are not players, and receive live card updates", a
   assert.equal(flipped.cards[0].visible, true);
   assert.ok(flipped.cards[0].name);
 });
+
+test("watch route remains directly accessible and missing rooms return the requested message", async (t) => {
+  const game = createApplication();
+  const address = await game.start();
+  const url = `http://127.0.0.1:${address.port}`;
+  t.after(() => game.close());
+
+  const response = await fetch(`${url}/watch/4821?obs=1`);
+  assert.equal(response.status, 200);
+  assert.match(await response.text(), /OBS用表示/);
+
+  const watcher = await connect(url);
+  t.after(() => watcher.close());
+  const unavailablePromise = once(watcher, "watchUnavailable");
+  watcher.emit("joinWatch", { roomId: "4821" });
+  assert.equal((await unavailablePromise).message, "ルームが見つかりません");
+});

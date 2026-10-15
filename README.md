@@ -41,7 +41,13 @@ npm test
 http://localhost:3000/watch/4821
 ```
 
-Render公開後は `https://サービス名.onrender.com/watch/4821` の形式です。観戦者はプレイヤー人数に含まれず、カード操作もできません。OBSではこのURLをブラウザソースに設定してください。
+Render公開後は `https://サービス名.onrender.com/watch/4821` の形式です。観戦者はプレイヤー人数に含まれず、カード操作もできません。
+
+OBS用のシンプル表示は、観戦画面の「OBS用表示」ボタンから開くか、URLに `?obs=1` を付けて直接開けます。OBSのブラウザソースは1920×1080に設定してください。
+
+```text
+https://サービス名.onrender.com/watch/4821?obs=1
+```
 
 ## 主な仕様
 

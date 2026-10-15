@@ -33,15 +33,46 @@
       </div>
 
       <div class="entry-card panel">
-        <label for="playerName">あなたの名前</label>
-        <input id="playerName" maxlength="16" autocomplete="nickname" placeholder="例：ちょぱ太郎">
-        <button id="createButton" class="button primary">ルームを作る</button>
-        <div class="divider"><span>または</span></div>
-        <label for="roomInput">ルーム番号</label>
-        <div class="join-row">
-          <input id="roomInput" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="4桁">
-          <button id="joinButton" class="button secondary">参加する</button>
+        <div class="entry-player-fields">
+          <label for="playerName">あなたの名前</label>
+          <input id="playerName" maxlength="16" autocomplete="nickname" placeholder="例：ちょぱ太郎">
         </div>
+
+        <section class="entry-action create-action" aria-labelledby="createActionTitle">
+          <div>
+            <span class="entry-number">1</span>
+            <h3 id="createActionTitle">ルームを作る</h3>
+            <p>新しいルームを作って友だちを招待</p>
+          </div>
+          <button id="createButton" class="button primary">ルームを作る</button>
+        </section>
+
+        <section class="entry-action" aria-labelledby="joinActionTitle">
+          <div>
+            <span class="entry-number">2</span>
+            <h3 id="joinActionTitle">ルームに参加</h3>
+            <p>名前と4桁のルームコードが必要です</p>
+          </div>
+          <div class="join-row">
+            <label class="sr-only" for="roomInput">参加するルームコード</label>
+            <input id="roomInput" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="4桁のコード" aria-describedby="joinActionTitle">
+            <button id="joinButton" class="button secondary">参加する</button>
+          </div>
+        </section>
+
+        <section class="entry-action watch-action" aria-labelledby="watchActionTitle">
+          <div>
+            <span class="entry-number">3</span>
+            <h3 id="watchActionTitle">観戦する</h3>
+            <p>名前は不要。見るだけの安全なモードです</p>
+          </div>
+          <div class="join-row">
+            <label class="sr-only" for="watchRoomInput">観戦するルームコード</label>
+            <input id="watchRoomInput" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="4桁のコード" aria-describedby="watchActionTitle watchInputError">
+            <button id="watchButton" class="button watch-button">観戦する</button>
+          </div>
+          <p id="watchInputError" class="field-error hidden" role="alert"></p>
+        </section>
       </div>
     </section>
 
