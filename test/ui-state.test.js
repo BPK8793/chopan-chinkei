@@ -212,6 +212,9 @@ test("card placement transforms the clickable card while flip animation stays on
   window.ChopanCardView.updateCard(button, card, 5, true);
 
   assert.equal(button.children[0].className, "card-flipper");
+  assert.equal(button.children[0].children[0].className, "card-face card-back");
+  assert.equal(button.children[0].children[0].children.length, 0, "the back has no directional image");
+  assert.equal(button.children[0].children[0].textContent, "", "the back has no text or suit mark");
   assert.equal(button.style.values.get("--card-x"), "24px");
   assert.equal(button.style.values.get("--card-y"), "-18px");
   assert.equal(button.style.values.get("--card-rotation"), "8deg");
@@ -221,4 +224,22 @@ test("card placement transforms the clickable card while flip animation stays on
   assert.equal(button.disabled, false);
   button.click();
   assert.equal(clickedIndex, 5);
+});
+
+test("card back uses one shared 180-degree symmetric design in every game view", () => {
+  const cardView = fs.readFileSync(path.join(__dirname, "..", "public", "card-view.js"), "utf8");
+  const styles = fs.readFileSync(path.join(__dirname, "..", "public", "style.css"), "utf8");
+  const player = fs.readFileSync(path.join(__dirname, "..", "public", "client.js"), "utf8");
+  const watcher = fs.readFileSync(path.join(__dirname, "..", "public", "watch.js"), "utf8");
+  const backStyles = styles.slice(styles.indexOf(".card-back {"), styles.indexOf(".card-front {"));
+
+  assert.doesNotMatch(cardView, /card_back|card-back-image/);
+  assert.doesNotMatch(backStyles, /[♠♥♣♦]|content:\s*["'][^"']+["']/);
+  assert.match(backStyles, /repeating-conic-gradient/);
+  assert.match(backStyles, /20% 20%/);
+  assert.match(backStyles, /80% 80%/);
+  assert.match(backStyles, /13% 13%/);
+  assert.match(backStyles, /87% 87%/);
+  assert.match(player, /ChopanCardView\.createCard/);
+  assert.match(watcher, /ChopanCardView\.createCard/);
 });

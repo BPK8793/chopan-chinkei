@@ -46,16 +46,6 @@
   function createCardBack() {
     const back = document.createElement("span");
     back.className = "card-face card-back";
-    const image = document.createElement("img");
-    image.className = "card-back-image hidden";
-    image.src = "/images/card_back.png";
-    image.alt = "";
-    image.addEventListener("load", () => {
-      image.classList.remove("hidden");
-      back.classList.add("has-image");
-    }, { once: true });
-    image.addEventListener("error", () => image.remove(), { once: true });
-    back.append(image);
     return back;
   }
 

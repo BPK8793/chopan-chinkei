@@ -136,11 +136,42 @@ input:focus { border-color: var(--pink); box-shadow: 0 0 0 4px #fbe1e8; }
 .memory-card:disabled { cursor: default; }
 .memory-card:not(:disabled):hover { filter: brightness(1.03); transform: translate(var(--card-x, 0), calc(var(--card-y, 0) - 3px)) rotate(var(--card-rotation, 0)); }
 .card-face { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; backface-visibility: hidden; border-radius: 15px; overflow: hidden; }
-.card-back { border: 4px solid white; color: white; background: repeating-linear-gradient(45deg, #f29bb0 0 9px, #f6afbf 9px 18px); box-shadow: 0 5px 12px rgba(93,65,73,.17); }
-.card-back::after { content: "♠"; display: grid; place-items: center; width: 46%; aspect-ratio: 1; border: 2px solid rgba(255,255,255,.9); border-radius: 50%; font-size: clamp(17px, 2.2vw, 27px); }
-.card-back.has-image { border: 0; background: white; }
-.card-back.has-image::after { display: none; }
-.card-back-image { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
+.card-back {
+  border: 4px solid white;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(255,255,255,.82) 0 3%, transparent 3.5%),
+    radial-gradient(circle at 80% 20%, rgba(255,255,255,.82) 0 3%, transparent 3.5%),
+    radial-gradient(circle at 20% 80%, rgba(255,255,255,.82) 0 3%, transparent 3.5%),
+    radial-gradient(circle at 80% 80%, rgba(255,255,255,.82) 0 3%, transparent 3.5%),
+    repeating-conic-gradient(from 15deg at 50% 50%, rgba(255,255,255,.16) 0 10deg, transparent 10deg 20deg),
+    #ef91a8;
+  box-shadow: 0 0 12px rgba(93,65,73,.17), inset 0 0 0 2px #d96885;
+}
+.card-back::before {
+  content: "";
+  position: absolute;
+  inset: 7%;
+  border: 3px double rgba(255,255,255,.94);
+  border-radius: 11px;
+  background:
+    radial-gradient(circle at 13% 13%, #fff8fa 0 3px, transparent 3.5px),
+    radial-gradient(circle at 87% 13%, #fff8fa 0 3px, transparent 3.5px),
+    radial-gradient(circle at 13% 87%, #fff8fa 0 3px, transparent 3.5px),
+    radial-gradient(circle at 87% 87%, #fff8fa 0 3px, transparent 3.5px);
+  box-shadow: inset 0 0 0 2px rgba(205,79,111,.4);
+}
+.card-back::after {
+  content: "";
+  position: relative;
+  width: 48%;
+  aspect-ratio: 1;
+  border: 4px double #fff9fb;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, #fff9fb 0 8%, transparent 9% 17%, rgba(255,249,251,.88) 18% 22%, transparent 23%),
+    repeating-conic-gradient(from 0deg, #fbd4de 0 15deg, #dc6f8b 15deg 30deg);
+  box-shadow: 0 0 0 4px rgba(202,76,108,.72), 0 0 0 7px rgba(255,255,255,.7);
+}
 .card-front { transform: rotateY(180deg); border: 2px solid #eadfe2; background: white; box-shadow: 0 5px 12px rgba(93,65,73,.12); }
 .card-front.goma { --card-accent: #6f6a69; --card-light: #eeeae8; }
 .card-front.rei { --card-accent: #e37691; --card-light: #ffedf2; }
