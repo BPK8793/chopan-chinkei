@@ -243,3 +243,35 @@ test("card back uses one shared 180-degree symmetric design in every game view",
   assert.match(player, /ChopanCardView\.createCard/);
   assert.match(watcher, /ChopanCardView\.createCard/);
 });
+
+test("all four chopa fronts prefer their numbered image and keep text as fallback", () => {
+  const { document } = createDom();
+  const window = {};
+  vm.runInNewContext(
+    fs.readFileSync(path.join(__dirname, "..", "public", "card-view.js"), "utf8"),
+    { document, window },
+    { filename: "card-view.js" }
+  );
+
+  for (let number = 1; number <= 4; number += 1) {
+    const card = {
+      character: "chopa",
+      name: "ちょぱ",
+      mark: "♦",
+      number,
+      joker: false,
+      visible: true,
+      matched: false
+    };
+    const button = window.ChopanCardView.createCard(card, number - 1, null);
+    const front = button.children[0].children[1];
+    const [image, fallback] = front.children;
+
+    assert.equal(image.src, `/images/chopa/chopa_${number}.png`);
+    assert.equal(fallback.children[0].textContent, "ちょぱ");
+    image.listeners.get("load")();
+    assert.equal(image.classList.contains("hidden"), false);
+    assert.equal(fallback.classList.contains("hidden"), true);
+    assert.equal(front.classList.contains("has-image"), true);
+  }
+});

@@ -352,3 +352,21 @@ test("watch route remains directly accessible and missing rooms return the reque
   watcher.emit("joinWatch", { roomId: "4821" });
   assert.equal((await unavailablePromise).message, "ルームが見つかりません");
 });
+
+test("all four supplied chopa images are served with the expected dimensions", async (t) => {
+  const game = createApplication();
+  const address = await game.start();
+  const url = `http://127.0.0.1:${address.port}`;
+  t.after(() => game.close());
+
+  for (let number = 1; number <= 4; number += 1) {
+    const response = await fetch(`${url}/images/chopa/chopa_${number}.png`);
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get("content-type"), /^image\/png/);
+    const image = Buffer.from(await response.arrayBuffer());
+    assert.equal(image.subarray(1, 4).toString(), "PNG");
+    assert.equal(image.readUInt32BE(16), 370);
+    assert.equal(image.readUInt32BE(20), 320);
+    assert.equal(image[25], 6, "the supplied PNG keeps its transparent background");
+  }
+});
