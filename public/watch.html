@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#fffaf3">
+  <title>観戦 | chopanとチン経衰弱</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body class="watch-body">
+  <main class="watch-shell">
+    <header class="watch-header">
+      <div class="watch-brand">
+        <span class="watch-live"><i></i> LIVE</span>
+        <h1>chopanと<span>チン経衰弱</span></h1>
+      </div>
+      <div class="watch-stats">
+        <div><span class="top-label">ROOM</span><strong id="watchRoomCode">----</strong></div>
+        <div class="turn-display"><span class="top-label">TURN</span><strong id="watchTurnName">-</strong></div>
+        <div><span class="top-label">のこり</span><strong><span id="watchRemainingPairs">17</span> ペア</strong></div>
+      </div>
+    </header>
+
+    <div id="watchPlayers" class="players-bar watch-players"></div>
+    <div id="watchStatus" class="watch-status">ルームに接続しています…</div>
+    <div id="watchEffect" class="effect-message hidden" aria-live="assertive"></div>
+    <div id="watchRevealTimer" class="reveal-timer hidden" aria-live="polite">全カード公開 <strong>3</strong></div>
+    <div id="watchCardGrid" class="card-grid watch-card-grid" aria-label="観戦中のカード盤面"></div>
+
+    <section id="watchResult" class="watch-result panel hidden" aria-labelledby="watchResultTitle">
+      <div>
+        <p class="eyebrow">GAME FINISH</p>
+        <h2 id="watchResultTitle">結果発表！</h2>
+      </div>
+      <div id="watchRanking" class="ranking watch-ranking"></div>
+    </section>
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/card-view.js"></script>
+  <script src="/watch.js"></script>
+</body>
+</html>

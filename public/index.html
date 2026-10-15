@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f6a9ba">
+  <meta name="description" content="2〜4人で遊べる、かわいいオンライン神経衰弱ゲーム">
+  <title>chopanとチン経衰弱</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="background-puffs" aria-hidden="true"></div>
+  <main class="app-shell">
+    <header class="brand">
+      <div class="brand-mark" aria-hidden="true">♠</div>
+      <div>
+        <p class="eyebrow">CHINCHILLA MEMORY GAME</p>
+        <h1>chopanと<span>チン経衰弱</span></h1>
+      </div>
+    </header>
+
+    <div id="connectionBanner" class="connection-banner hidden" role="status">サーバーに再接続しています…</div>
+    <div id="toast" class="toast hidden" role="alert"></div>
+
+    <section id="homeScreen" class="screen home-screen">
+      <div class="hero-card panel">
+        <div class="mascot" aria-hidden="true">
+          <span class="ear left"></span><span class="ear right"></span>
+          <span class="face">• ᴥ •</span>
+        </div>
+        <h2>みんなでカードを<br>そろえよう！</h2>
+        <p>2〜4人で遊べるオンライン神経衰弱。<br>はげちょぱを揃えると、とっておきの効果が発動！</p>
+      </div>
+
+      <div class="entry-card panel">
+        <label for="playerName">あなたの名前</label>
+        <input id="playerName" maxlength="16" autocomplete="nickname" placeholder="例：ちょぱ太郎">
+        <button id="createButton" class="button primary">ルームを作る</button>
+        <div class="divider"><span>または</span></div>
+        <label for="roomInput">ルーム番号</label>
+        <div class="join-row">
+          <input id="roomInput" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="4桁">
+          <button id="joinButton" class="button secondary">参加する</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="roomScreen" class="screen hidden">
+      <div class="room-head panel compact">
+        <div>
+          <p class="eyebrow">ROOM NUMBER</p>
+          <div class="room-code"><span id="roomCode">----</span><button id="copyRoomButton" class="icon-button" aria-label="ルーム番号をコピー">コピー</button></div>
+        </div>
+        <button id="leaveRoomButton" class="text-button">退出する</button>
+      </div>
+      <div class="lobby-grid">
+        <div class="panel lobby-main">
+          <h2>なかまたち</h2>
+          <p id="playerCount" class="muted">1 / 4人</p>
+          <div id="lobbyPlayers" class="lobby-players"></div>
+        </div>
+        <div class="panel lobby-guide">
+          <div class="guide-icon">✦</div>
+          <h2>遊びかた</h2>
+          <p>同じキャラクターと番号のカードを2枚見つけよう。</p>
+          <p>はげちょぱは2点！さらに全部のカードが3秒見えるよ。</p>
+          <button id="startButton" class="button primary" disabled>ゲームをはじめる</button>
+          <p id="startHint" class="hint">あと1人で開始できます</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="gameScreen" class="screen hidden">
+      <div class="game-topbar">
+        <div><span class="top-label">ROOM</span><strong id="gameRoomCode">----</strong></div>
+        <div class="turn-display"><span class="top-label">TURN</span><strong id="turnName">-</strong></div>
+        <div><span class="top-label">のこり</span><strong><span id="remainingPairs">17</span> ペア</strong></div>
+      </div>
+      <div id="playersBar" class="players-bar"></div>
+      <div id="effectMessage" class="effect-message hidden" aria-live="assertive"></div>
+      <div id="revealTimer" class="reveal-timer hidden" aria-live="polite">全カード公開 <strong>3</strong></div>
+      <div id="cardGrid" class="card-grid" aria-label="カード盤面"></div>
+    </section>
+
+    <div id="resultModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
+      <div class="modal-card panel">
+        <div class="confetti" aria-hidden="true">✦　●　✦</div>
+        <p class="eyebrow">GAME FINISH</p>
+        <h2 id="resultTitle">結果発表！</h2>
+        <div id="ranking" class="ranking"></div>
+        <button id="rematchButton" class="button primary">もう一度遊ぶ</button>
+        <button id="lobbyButton" class="button secondary">ルームに戻る</button>
+        <button id="topButton" class="text-button modal-link">トップへ戻る</button>
+        <p id="rematchHint" class="hint"></p>
+      </div>
+    </div>
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/card-view.js"></script>
+  <script src="/client.js"></script>
+</body>
+</html>
