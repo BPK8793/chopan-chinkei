@@ -130,13 +130,14 @@ test("start button is shown only to the waiting host and disappears on game star
   assert.equal(startButton.classList.contains("hidden"), false);
   assert.equal(startButton.disabled, false);
 
-  socket.receive("gameStarted", baseState({ status: "playing", message: "ゲームスタート！" }));
+  socket.receive("gameStarted", baseState({ status: "playing" }));
   assert.equal(startButton.classList.contains("hidden"), true);
   assert.equal(startButton.disabled, true);
   assert.equal(elements.get("roomScreen").classList.contains("hidden"), true);
   assert.equal(elements.get("gameScreen").classList.contains("hidden"), false);
   assert.equal(elements.get("currentTurnStatus").textContent, "現在のターン：あなた");
   assert.equal(elements.get("turnInstruction").textContent, "2枚選んでください（0/2）");
+  assert.equal(elements.get("effectMessage").classList.contains("hidden"), true);
 });
 
 test("start button stays hidden for a non-host and hides immediately after host click", () => {
@@ -169,4 +170,18 @@ test("watch screen has no start control and switches to read-only progress displ
   assert.equal(elements.get("watchProgress").classList.contains("hidden"), false);
   assert.equal(elements.get("watchCurrentTurnStatus").textContent, "現在のターン：ホスト");
   assert.equal(elements.get("watchTurnInstruction").textContent, "ホストさんが2枚選んでいます");
+  assert.equal(elements.get("watchEffect").classList.contains("hidden"), true);
+});
+
+test("OBS screen keeps the game start overlay hidden", () => {
+  const { socket, elements } = runBrowserScript(
+    "watch.js",
+    "observer",
+    { pathname: "/watch/1234", search: "?obs=1" }
+  );
+
+  socket.receive("gameStarted", baseState({ status: "playing" }));
+
+  assert.equal(elements.get("watchProgress").classList.contains("hidden"), false);
+  assert.equal(elements.get("watchEffect").classList.contains("hidden"), true);
 });

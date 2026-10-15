@@ -57,6 +57,7 @@ test("room creation, joining and host-only game start are synchronized", async (
   assert.equal(started.cards.length, 34);
   assert.equal(started.cards.every((card) => !card.name), true, "hidden cards do not leak their identity");
   assert.equal(started.currentPlayerId, host.id);
+  assert.equal(started.message, "", "game start does not emit a large overlay message");
 });
 
 test("server rejects an out-of-turn flip and resolves a normal pair", async (t) => {
@@ -207,6 +208,7 @@ test("watchers are read-only, are not players, and receive live card updates", a
   assert.equal(started.status, "playing");
   assert.equal(started.cards.length, 34);
   assert.equal(started.cards.every((card) => !card.name), true);
+  assert.equal(started.message, "", "watchers do not receive a game start overlay message");
 
   const watcherFlip = once(watcher, "cardFlipped");
   host.emit("flipCard", { index: 0 });
