@@ -3,7 +3,12 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { io: createClient } = require("socket.io-client");
-const { createApplication, createDeck } = require("../server");
+const {
+  CARD_LAYOUT,
+  createApplication,
+  createCardLayout,
+  createDeck
+} = require("../server");
 
 function once(socket, event) {
   return new Promise((resolve) => socket.once(event, resolve));
@@ -25,6 +30,34 @@ test("deck has 16 normal pairs and one joker pair", () => {
   assert.equal(counts.size, 17);
   counts.forEach((count) => assert.equal(count, 2));
   assert.equal(deck.filter((card) => card.joker).length, 2);
+});
+
+test("server-generated card layout stays within bounds and avoids excessive overlap", () => {
+  let seed = 123456;
+  const random = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+  const layout = createCardLayout(34, random);
+
+  assert.equal(layout.length, 34);
+  layout.forEach((card) => {
+    assert.ok(Math.abs(card.xOffset) <= CARD_LAYOUT.X_OFFSET_MAX);
+    assert.ok(Math.abs(card.yOffset) <= CARD_LAYOUT.Y_OFFSET_MAX);
+    assert.ok(Math.abs(card.rotation) <= CARD_LAYOUT.MAX_ROTATION);
+    assert.ok(card.zIndex >= 1 && card.zIndex <= 20);
+  });
+
+  for (let first = 0; first < layout.length; first += 1) {
+    for (let second = 0; second < first; second += 1) {
+      for (const columns of CARD_LAYOUT.VALIDATED_COLUMNS) {
+        const dx = ((first % columns) - (second % columns))
+          * (CARD_LAYOUT.REFERENCE_CARD_WIDTH + CARD_LAYOUT.COLUMN_GAP)
+          + layout[first].xOffset - layout[second].xOffset;
+        const dy = (Math.floor(first / columns) - Math.floor(second / columns))
+          * (CARD_LAYOUT.REFERENCE_CARD_HEIGHT + CARD_LAYOUT.ROW_GAP)
+          + layout[first].yOffset - layout[second].yOffset;
+        assert.ok(Math.hypot(dx, dy) >= CARD_LAYOUT.MIN_CENTER_DISTANCE);
+      }
+    }
+  }
 });
 
 test("room creation, joining and host-only game start are synchronized", async (t) => {
@@ -215,6 +248,92 @@ test("watchers are read-only, are not players, and receive live card updates", a
   const flipped = await watcherFlip;
   assert.equal(flipped.cards[0].visible, true);
   assert.ok(flipped.cards[0].name);
+});
+
+test("players, late watchers, and rematches receive the authoritative room layout", async (t) => {
+  let seed = 98765;
+  const random = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+  const game = createApplication({ random, failDelay: 10, jokerDelay: 15 });
+  const address = await game.start();
+  const url = `http://127.0.0.1:${address.port}`;
+  t.after(() => game.close());
+  const host = await connect(url);
+  const guest = await connect(url);
+  const watcher = await connect(url);
+  t.after(() => { host.close(); guest.close(); watcher.close(); });
+
+  const createdPromise = once(host, "roomCreated");
+  host.emit("createRoom", { name: "A" });
+  const { roomId } = await createdPromise;
+  const joinedPromise = once(guest, "roomJoined");
+  guest.emit("joinRoom", { name: "B", roomId });
+  await joinedPromise;
+
+  const hostStarted = once(host, "gameStarted");
+  const guestStarted = once(guest, "gameStarted");
+  host.emit("startGame");
+  const [hostState, guestState] = await Promise.all([hostStarted, guestStarted]);
+  const firstLayout = hostState.cards.map(({ xOffset, yOffset, rotation, zIndex }) => (
+    { xOffset, yOffset, rotation, zIndex }
+  ));
+  assert.deepEqual(guestState.cards.map(({ xOffset, yOffset, rotation, zIndex }) => (
+    { xOffset, yOffset, rotation, zIndex }
+  )), firstLayout);
+
+  const lateJoin = once(watcher, "watchJoined");
+  watcher.emit("joinWatch", { roomId });
+  const watchState = await lateJoin;
+  assert.deepEqual(watchState.cards.map(({ xOffset, yOffset, rotation, zIndex }) => (
+    { xOffset, yOffset, rotation, zIndex }
+  )), firstLayout);
+
+  game.rooms.get(roomId).status = "finished";
+  host.emit("requestRematch");
+  const rematchStarted = once(host, "gameStarted");
+  guest.emit("requestRematch");
+  const rematch = await rematchStarted;
+  const secondLayout = rematch.cards.map(({ xOffset, yOffset, rotation, zIndex }) => (
+    { xOffset, yOffset, rotation, zIndex }
+  ));
+  assert.notDeepEqual(secondLayout, firstLayout);
+});
+
+test("a player can reload and resume the same server-side board", async (t) => {
+  const game = createApplication({ failDelay: 10, jokerDelay: 15 });
+  const address = await game.start();
+  const url = `http://127.0.0.1:${address.port}`;
+  t.after(() => game.close());
+  const host = await connect(url);
+  const guest = await connect(url);
+  t.after(() => { host.close(); guest.close(); });
+
+  const createdPromise = once(host, "roomCreated");
+  host.emit("createRoom", { name: "A" });
+  const created = await createdPromise;
+  const guestJoined = once(guest, "roomJoined");
+  guest.emit("joinRoom", { name: "B", roomId: created.roomId });
+  const guestState = await guestJoined;
+  const startedPromise = once(host, "gameStarted");
+  host.emit("startGame");
+  const started = await startedPromise;
+  const boardLayout = started.cards.map(({ xOffset, yOffset, rotation, zIndex }) => (
+    { xOffset, yOffset, rotation, zIndex }
+  ));
+
+  guest.close();
+  const resumedSocket = await connect(url);
+  t.after(() => resumedSocket.close());
+  const resumedPromise = once(resumedSocket, "roomResumed");
+  resumedSocket.emit("resumeRoom", {
+    roomId: created.roomId,
+    resumeToken: guestState.resumeToken
+  });
+  const resumed = await resumedPromise;
+  assert.equal(resumed.status, "playing");
+  assert.equal(resumed.players.find((player) => player.name === "B").id, resumedSocket.id);
+  assert.deepEqual(resumed.cards.map(({ xOffset, yOffset, rotation, zIndex }) => (
+    { xOffset, yOffset, rotation, zIndex }
+  )), boardLayout);
 });
 
 test("watch route remains directly accessible and missing rooms return the requested message", async (t) => {

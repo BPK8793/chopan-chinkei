@@ -32,6 +32,10 @@ class FakeElement {
     this.textContent = "";
     this.disabled = false;
     this.dataset = {};
+    this.style = {
+      values: new Map(),
+      setProperty: (name, value) => this.style.values.set(name, value)
+    };
   }
 
   append(...children) { this.children.push(...children); }
@@ -101,7 +105,7 @@ function runBrowserScript(filename, socketId, location = { pathname: "/", search
   const context = {
     document,
     io: () => socket,
-    localStorage: { getItem: () => "", setItem: () => {} },
+    localStorage: { getItem: () => "", setItem: () => {}, removeItem: () => {} },
     location,
     navigator: { clipboard: { writeText: async () => {} } },
     window: { location: { assign: () => {}, reload: () => {} }, open: () => {} },
@@ -184,4 +188,37 @@ test("OBS screen keeps the game start overlay hidden", () => {
 
   assert.equal(elements.get("watchProgress").classList.contains("hidden"), false);
   assert.equal(elements.get("watchEffect").classList.contains("hidden"), true);
+});
+
+test("card placement transforms the clickable card while flip animation stays on its child", () => {
+  const { document } = createDom();
+  const window = {};
+  vm.runInNewContext(
+    fs.readFileSync(path.join(__dirname, "..", "public", "card-view.js"), "utf8"),
+    { document, window },
+    { filename: "card-view.js" }
+  );
+  let clickedIndex = null;
+  const card = {
+    id: "hidden-card",
+    matched: false,
+    visible: false,
+    xOffset: 24,
+    yOffset: -18,
+    rotation: 8,
+    zIndex: 12
+  };
+  const button = window.ChopanCardView.createCard(card, 5, (index) => { clickedIndex = index; });
+  window.ChopanCardView.updateCard(button, card, 5, true);
+
+  assert.equal(button.children[0].className, "card-flipper");
+  assert.equal(button.style.values.get("--card-x"), "24px");
+  assert.equal(button.style.values.get("--card-y"), "-18px");
+  assert.equal(button.style.values.get("--card-rotation"), "8deg");
+  assert.equal(button.style.values.get("--card-x-mobile"), "10.8px");
+  assert.equal(button.style.values.get("--card-rotation-mobile"), "4.8deg");
+  assert.equal(button.style.zIndex, "12");
+  assert.equal(button.disabled, false);
+  button.click();
+  assert.equal(clickedIndex, 5);
 });

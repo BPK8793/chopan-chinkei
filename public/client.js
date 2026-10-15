@@ -7,6 +7,19 @@ let revealInterval = null;
 
 const $ = (id) => document.getElementById(id);
 const screens = [$("homeScreen"), $("roomScreen"), $("gameScreen")];
+const RESUME_ROOM_KEY = "chopan-resume-room";
+const RESUME_TOKEN_KEY = "chopan-resume-token";
+
+function saveResumeCredentials(nextState) {
+  if (!nextState?.resumeToken) return;
+  localStorage.setItem(RESUME_ROOM_KEY, nextState.roomId);
+  localStorage.setItem(RESUME_TOKEN_KEY, nextState.resumeToken);
+}
+
+function clearResumeCredentials() {
+  localStorage.removeItem(RESUME_ROOM_KEY);
+  localStorage.removeItem(RESUME_TOKEN_KEY);
+}
 
 function showScreen(screen) {
   screens.forEach((item) => item.classList.toggle("hidden", item !== screen));
@@ -151,6 +164,7 @@ function renderResults() {
 }
 
 function applyState(next) {
+  saveResumeCredentials(next);
   state = next;
   if (state.status !== "waiting") {
     $("startButton").classList.add("hidden");
@@ -167,11 +181,16 @@ function applyState(next) {
   }
 }
 
-socket.on("connect", () => $("connectionBanner").classList.add("hidden"));
+socket.on("connect", () => {
+  $("connectionBanner").classList.add("hidden");
+  const roomId = localStorage.getItem(RESUME_ROOM_KEY);
+  const resumeToken = localStorage.getItem(RESUME_TOKEN_KEY);
+  if (roomId && resumeToken) socket.emit("resumeRoom", { roomId, resumeToken });
+});
 socket.on("disconnect", () => $("connectionBanner").classList.remove("hidden"));
 socket.on("connect_error", () => $("connectionBanner").classList.remove("hidden"));
 [
-  "roomCreated", "roomUpdated", "gameStarted", "cardFlipped", "pairMatched",
+  "roomCreated", "roomJoined", "roomResumed", "roomUpdated", "gameStarted", "cardFlipped", "pairMatched",
   "pairFailed", "turnChanged", "jokerActivated", "gameEnded"
 ].forEach((event) => socket.on(event, applyState));
 socket.on("errorMessage", ({ message }) => {
@@ -179,6 +198,7 @@ socket.on("errorMessage", ({ message }) => {
   // 開始要求が拒否された場合は、最新の待機状態に合う表示へ戻す。
   if (state?.status === "waiting") renderLobby();
 });
+socket.on("resumeUnavailable", () => clearResumeCredentials());
 
 $("createButton").addEventListener("click", () => socket.emit("createRoom", { name: saveName() }));
 $("joinButton").addEventListener("click", () => socket.emit("joinRoom", { name: saveName(), roomId: $("roomInput").value }));
@@ -209,13 +229,22 @@ $("startButton").addEventListener("click", () => {
   $("startHint").textContent = "ゲームを開始しています…";
   socket.emit("startGame");
 });
-$("leaveRoomButton").addEventListener("click", () => { socket.emit("leaveRoom"); state = null; showScreen($("homeScreen")); });
+$("leaveRoomButton").addEventListener("click", () => {
+  socket.emit("leaveRoom");
+  clearResumeCredentials();
+  state = null;
+  showScreen($("homeScreen"));
+});
 $("copyRoomButton").addEventListener("click", async () => {
   try { await navigator.clipboard.writeText(state.roomId); showToast("ルーム番号をコピーしました"); }
   catch { showToast(`ルーム番号は ${state.roomId} です`); }
 });
 $("rematchButton").addEventListener("click", () => socket.emit("requestRematch"));
 $("lobbyButton").addEventListener("click", () => socket.emit("returnToLobby"));
-$("topButton").addEventListener("click", () => { socket.emit("leaveRoom"); window.location.reload(); });
+$("topButton").addEventListener("click", () => {
+  socket.emit("leaveRoom");
+  clearResumeCredentials();
+  window.location.reload();
+});
 
 $("playerName").value = localStorage.getItem("chopan-player-name") || "";

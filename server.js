@@ -2,6 +2,7 @@
 
 const path = require("path");
 const http = require("http");
+const crypto = require("crypto");
 const express = require("express");
 const { Server } = require("socket.io");
 
@@ -9,6 +10,18 @@ const MAX_PLAYERS = 4;
 const MIN_PLAYERS = 2;
 const PAIR_FAIL_DELAY = 1200;
 const JOKER_REVEAL_DELAY = 3000;
+const CARD_LAYOUT = Object.freeze({
+  X_OFFSET_MAX: 30,
+  Y_OFFSET_MAX: 30,
+  MAX_ROTATION: 10,
+  MIN_CENTER_DISTANCE: 82,
+  REFERENCE_CARD_WIDTH: 100,
+  REFERENCE_CARD_HEIGHT: 133,
+  COLUMN_GAP: 10,
+  ROW_GAP: 12,
+  VALIDATED_COLUMNS: [4, 6, 7, 9],
+  MAX_ATTEMPTS: 32
+});
 
 function shuffle(items, random = Math.random) {
   const result = [...items];
@@ -58,6 +71,63 @@ function createDeck(random = Math.random) {
   return shuffle(cards, random);
 }
 
+function roundLayoutValue(value) {
+  return Math.round(value * 10) / 10;
+}
+
+function layoutDistance(first, second, columns) {
+  const firstColumn = first.index % columns;
+  const firstRow = Math.floor(first.index / columns);
+  const secondColumn = second.index % columns;
+  const secondRow = Math.floor(second.index / columns);
+  const baseX = CARD_LAYOUT.REFERENCE_CARD_WIDTH + CARD_LAYOUT.COLUMN_GAP;
+  const baseY = CARD_LAYOUT.REFERENCE_CARD_HEIGHT + CARD_LAYOUT.ROW_GAP;
+  const dx = (firstColumn - secondColumn) * baseX + first.xOffset - second.xOffset;
+  const dy = (firstRow - secondRow) * baseY + first.yOffset - second.yOffset;
+  return Math.hypot(dx, dy);
+}
+
+function minimumLayoutDistance(candidate, placements) {
+  if (!placements.length) return Infinity;
+  let minimum = Infinity;
+  for (const placement of placements) {
+    for (const columns of CARD_LAYOUT.VALIDATED_COLUMNS) {
+      minimum = Math.min(minimum, layoutDistance(candidate, placement, columns));
+    }
+  }
+  return minimum;
+}
+
+function createCardLayout(cardCount, random = Math.random) {
+  const placements = [];
+  for (let index = 0; index < cardCount; index += 1) {
+    let chosen = null;
+    let bestDistance = -Infinity;
+    for (let attempt = 0; attempt < CARD_LAYOUT.MAX_ATTEMPTS; attempt += 1) {
+      const candidate = {
+        index,
+        xOffset: roundLayoutValue((random() * 2 - 1) * CARD_LAYOUT.X_OFFSET_MAX),
+        yOffset: roundLayoutValue((random() * 2 - 1) * CARD_LAYOUT.Y_OFFSET_MAX),
+        rotation: roundLayoutValue((random() * 2 - 1) * CARD_LAYOUT.MAX_ROTATION),
+        zIndex: 1 + Math.floor(random() * 20)
+      };
+      const distance = minimumLayoutDistance(candidate, placements);
+      if (distance > bestDistance) {
+        chosen = candidate;
+        bestDistance = distance;
+      }
+      if (distance >= CARD_LAYOUT.MIN_CENTER_DISTANCE) break;
+    }
+    placements.push(chosen);
+  }
+  return placements.map(({ index: _index, ...placement }) => placement);
+}
+
+function applyCardLayout(cards, random = Math.random) {
+  const layout = createCardLayout(cards.length, random);
+  return cards.map((card, index) => ({ ...card, ...layout[index] }));
+}
+
 function cleanName(value) {
   return String(value || "").trim().replace(/\s+/g, " ").slice(0, 16);
 }
@@ -98,7 +168,15 @@ function createApplication(options = {}) {
   }
 
   function safeCard(card, visible) {
-    const base = { id: card.id, matched: card.matched, visible };
+    const base = {
+      id: card.id,
+      matched: card.matched,
+      visible,
+      xOffset: card.xOffset,
+      yOffset: card.yOffset,
+      rotation: card.rotation,
+      zIndex: card.zIndex
+    };
     if (!visible && !card.matched) return base;
     return {
       ...base,
@@ -182,7 +260,7 @@ function createApplication(options = {}) {
   function startRound(room) {
     room.roundId += 1;
     room.status = "playing";
-    room.cards = createDeck(random);
+    room.cards = applyCardLayout(createDeck(random), random);
     room.selectedCards = [];
     room.currentPlayerIndex = room.players.findIndex((player) => player.connected);
     room.currentPlayerIndex = Math.max(room.currentPlayerIndex, 0);
@@ -273,7 +351,14 @@ function createApplication(options = {}) {
       const room = {
         id,
         hostSocketId: socket.id,
-        players: [{ id: socket.id, name, score: 0, connected: true, rematch: false }],
+        players: [{
+          id: socket.id,
+          name,
+          score: 0,
+          connected: true,
+          rematch: false,
+          resumeToken: crypto.randomUUID()
+        }],
         status: "waiting",
         cards: [],
         selectedCards: [],
@@ -286,7 +371,7 @@ function createApplication(options = {}) {
       };
       rooms.set(id, room);
       socket.join(id);
-      socket.emit("roomCreated", publicState(room));
+      socket.emit("roomCreated", { ...publicState(room), resumeToken: room.players[0].resumeToken });
       broadcast(room);
     });
 
@@ -303,8 +388,37 @@ function createApplication(options = {}) {
       if (room.players.some((player) => player.name === name)) {
         return emitError(socket, "同じ名前のプレイヤーがいます");
       }
-      room.players.push({ id: socket.id, name, score: 0, connected: true, rematch: false });
+      const player = {
+        id: socket.id,
+        name,
+        score: 0,
+        connected: true,
+        rematch: false,
+        resumeToken: crypto.randomUUID()
+      };
+      room.players.push(player);
       socket.join(room.id);
+      socket.emit("roomJoined", { ...publicState(room), resumeToken: player.resumeToken });
+      broadcast(room);
+    });
+
+    socket.on("resumeRoom", (payload = {}) => {
+      if (socket.data.isWatcher || findMembership(socket)) return;
+      const roomId = String(payload.roomId || "").trim();
+      const resumeToken = String(payload.resumeToken || "");
+      const room = rooms.get(roomId);
+      const player = room?.players.find((candidate) => candidate.resumeToken === resumeToken);
+      if (!room || !player) {
+        return socket.emit("resumeUnavailable", { message: "前回のルームには復帰できませんでした" });
+      }
+
+      const previousSocketId = player.id;
+      if (room.hostSocketId === previousSocketId) room.hostSocketId = socket.id;
+      player.id = socket.id;
+      player.connected = true;
+      socket.join(room.id);
+      ensureCurrentConnected(room);
+      socket.emit("roomResumed", { ...publicState(room), resumeToken: player.resumeToken });
       broadcast(room);
     });
 
@@ -423,4 +537,11 @@ if (require.main === module) {
   instance.server.listen(PORT, () => console.log(`chopanとチン経衰弱: http://localhost:${PORT}`));
 }
 
-module.exports = { createApplication, createDeck, shuffle };
+module.exports = {
+  CARD_LAYOUT,
+  applyCardLayout,
+  createApplication,
+  createCardLayout,
+  createDeck,
+  shuffle
+};
