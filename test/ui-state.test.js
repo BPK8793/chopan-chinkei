@@ -323,6 +323,34 @@ test("turn speech runs once when an opponent hands the turn to this player", () 
   assert.equal(spoken[0].rate, 1.3125);
 });
 
+test("joker chance uses one slower and higher special announcement", () => {
+  const { controller, documentListeners, spoken } = runSoundManager();
+  documentListeners.get("pointerdown")();
+  const before = baseState({ status: "playing", revealAll: false });
+  const activated = baseState({ status: "playing", revealAll: true });
+
+  controller.handleGameEvent("jokerActivated", activated, before, { selfId: "guest" });
+  controller.handleGameEvent("jokerActivated", activated, activated, { selfId: "guest" });
+  controller.handleGameEvent("roomUpdated", activated, activated, { selfId: "guest" });
+
+  assert.equal(spoken.length, 1);
+  assert.equal(spoken[0].text, "はげちょぱ！ チャーーーーンス！");
+  assert.equal(spoken[0].lang, "ja-JP");
+  assert.equal(spoken[0].rate, 0.92);
+  assert.equal(spoken[0].pitch, 1.45);
+});
+
+test("joker announcement stays silent when spectator speech is off", () => {
+  const { controller, documentListeners, spoken } = runSoundManager("watch");
+  documentListeners.get("pointerdown")();
+  controller.handleGameEvent(
+    "jokerActivated",
+    baseState({ status: "playing", revealAll: true }),
+    baseState({ status: "playing", revealAll: false })
+  );
+  assert.deepEqual(spoken, []);
+});
+
 test("joker countdown ticks once per displayed second and respects mute", () => {
   const { controller, documentListeners, elements, synthesized } = runSoundManager();
   documentListeners.get("pointerdown")();

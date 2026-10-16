@@ -132,13 +132,13 @@
       } catch { /* カウント音が使えなくてもゲームは続行 */ }
     }
 
-    function speak(name) {
-      if (!settings.speech || !unlocked || !name || !("speechSynthesis" in window)) return;
+    function speak(text, { rate = 1.3125, pitch = 1.08 } = {}) {
+      if (!settings.speech || !unlocked || !text || !("speechSynthesis" in window)) return;
       try {
-        const utterance = new SpeechSynthesisUtterance(`${name}さんのばんだよ`);
+        const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = "ja-JP";
-        utterance.rate = 1.3125;
-        utterance.pitch = 1.08;
+        utterance.rate = rate;
+        utterance.pitch = pitch;
         const japaneseVoice = window.speechSynthesis.getVoices().find((voice) => voice.lang?.toLowerCase().startsWith("ja"));
         if (japaneseVoice) utterance.voice = japaneseVoice;
         window.speechSynthesis.cancel();
@@ -148,6 +148,10 @@
 
     function handleGameEvent(eventName, nextState, previousState, { selfId } = {}) {
       play(eventName);
+      const jokerJustActivated = eventName === "jokerActivated" && nextState?.revealAll && !previousState?.revealAll;
+      if (jokerJustActivated) {
+        speak("はげちょぱ！ チャーーーーンス！", { rate: 0.92, pitch: 1.45 });
+      }
       if (!nextState || nextState.status !== "playing") return;
       const current = nextState.players?.find((player) => player.id === nextState.currentPlayerId);
       if (!current) return;
@@ -155,13 +159,13 @@
       if (mode === "player") {
         const becameMyTurn = current.id === selfId && previousState?.currentPlayerId !== selfId;
         const roundStartedForMe = eventName === "gameStarted" && current.id === selfId && previousState?.status !== "playing";
-        if ((eventName === "turnChanged" && becameMyTurn) || roundStartedForMe) speak(current.name);
+        if ((eventName === "turnChanged" && becameMyTurn) || roundStartedForMe) speak(`${current.name}さんのばんだよ`);
         return;
       }
 
       const turnChanged = previousState?.currentPlayerId !== nextState.currentPlayerId;
       const roundStarted = eventName === "gameStarted" && previousState?.status !== "playing";
-      if ((eventName === "turnChanged" && turnChanged) || roundStarted) speak(current.name);
+      if ((eventName === "turnChanged" && turnChanged) || roundStarted) speak(`${current.name}さんのばんだよ`);
     }
 
     function bindControls() {
