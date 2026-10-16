@@ -112,7 +112,10 @@ input:focus { border-color: var(--pink); box-shadow: 0 0 0 4px #fbe1e8; }
 .lobby-guide .button { width: 100%; margin-top: 18px; }
 .hint { margin: 10px 0 0; font-size: 12px; text-align: center; }
 
+.game-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: stretch; }
 .game-topbar { min-height: 67px; padding: 12px 22px; display: grid; grid-template-columns: 1fr 1.3fr 1fr; align-items: center; text-align: center; border-radius: 22px; background: white; box-shadow: var(--shadow); }
+.game-quit-button { min-width: 116px; padding: 0 16px; border: 2px solid #f0b8c5; border-radius: 18px; color: #a63f59; background: rgba(255,255,255,.94); box-shadow: var(--shadow); cursor: pointer; font-size: 12px; font-weight: 900; }
+.game-quit-button:hover { background: #fff0f4; }
 .top-label { display: block; margin-bottom: 2px; font-size: 9px; font-weight: 900; letter-spacing: .13em; color: #a3969a; }
 .game-topbar strong { font-size: 16px; }
 .turn-display { padding: 7px 10px; border-radius: 13px; background: #fff0f4; color: var(--pink-dark); }
@@ -262,6 +265,8 @@ input:focus { border-color: var(--pink); box-shadow: 0 0 0 4px #fbe1e8; }
 .modal { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 20px; background: rgba(67,49,55,.45); backdrop-filter: blur(5px); }
 .modal-card { width: min(430px, 100%); max-height: 92vh; overflow: auto; padding: 34px; text-align: center; }
 .modal-card .button { width: 100%; }
+.quit-game-card p { margin: 8px 0 20px; }
+.quit-game-card .secondary { margin-top: 9px; }
 .confetti { margin-bottom: 16px; color: var(--pink); font-size: 24px; letter-spacing: .2em; }
 .ranking { display: grid; gap: 8px; margin: 22px 0; text-align: left; }
 .rank-row { display: grid; grid-template-columns: 46px 1fr auto; align-items: center; padding: 12px 15px; border-radius: 14px; background: #fff3f6; font-weight: 900; }
@@ -290,6 +295,8 @@ input:focus { border-color: var(--pink); box-shadow: 0 0 0 4px #fbe1e8; }
   .lobby-players { grid-template-columns: 1fr; }
   .game-topbar { padding: 9px 8px; grid-template-columns: .8fr 1.35fr .85fr; }
   .game-topbar strong { font-size: 12px; }
+  .game-toolbar { grid-template-columns: 1fr; gap: 7px; }
+  .game-quit-button { min-height: 38px; justify-self: end; padding: 0 13px; border-radius: 13px; }
   .game-progress { padding: 9px 10px; gap: 7px 10px; flex-wrap: wrap; }
   .game-progress > span:last-child { width: 100%; text-align: center; }
   .players-bar { margin: 9px 0; gap: 5px; }

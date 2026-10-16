@@ -159,6 +159,28 @@ test("start button stays hidden for a non-host and hides immediately after host 
   assert.equal(hostUi.elements.get("startButton").classList.contains("hidden"), false);
 });
 
+test("a player can confirm leaving from the active game screen", () => {
+  const html = fs.readFileSync(path.join(__dirname, "..", "public", "index.html"), "utf8");
+  assert.match(html, /id="quitGameButton"/);
+  assert.match(html, /id="quitGameModal"/);
+
+  const { socket, elements } = runBrowserScript("client.js", "host");
+  socket.receive("gameStarted", baseState({ status: "playing" }));
+
+  elements.get("quitGameButton").click();
+  assert.equal(elements.get("quitGameModal").classList.contains("hidden"), false);
+  assert.notEqual(socket.emitted.at(-1)?.[0], "leaveRoom");
+
+  elements.get("cancelQuitGameButton").click();
+  assert.equal(elements.get("quitGameModal").classList.contains("hidden"), true);
+
+  elements.get("quitGameButton").click();
+  elements.get("confirmQuitGameButton").click();
+  assert.equal(socket.emitted.at(-1)[0], "leaveRoom");
+  assert.equal(elements.get("homeScreen").classList.contains("hidden"), false);
+  assert.equal(elements.get("gameScreen").classList.contains("hidden"), true);
+});
+
 test("watch screen has no start control and switches to read-only progress display", () => {
   const watchHtml = fs.readFileSync(path.join(__dirname, "..", "public", "watch.html"), "utf8");
   assert.doesNotMatch(watchHtml, /id=["']startButton["']/);

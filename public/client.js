@@ -235,6 +235,20 @@ $("leaveRoomButton").addEventListener("click", () => {
   state = null;
   showScreen($("homeScreen"));
 });
+$("quitGameButton").addEventListener("click", () => {
+  $("quitGameModal").classList.remove("hidden");
+});
+$("cancelQuitGameButton").addEventListener("click", () => {
+  $("quitGameModal").classList.add("hidden");
+});
+$("confirmQuitGameButton").addEventListener("click", () => {
+  socket.emit("leaveRoom");
+  clearResumeCredentials();
+  state = null;
+  $("quitGameModal").classList.add("hidden");
+  $("resultModal").classList.add("hidden");
+  showScreen($("homeScreen"));
+});
 $("copyRoomButton").addEventListener("click", async () => {
   try { await navigator.clipboard.writeText(state.roomId); showToast("ルーム番号をコピーしました"); }
   catch { showToast(`ルーム番号は ${state.roomId} です`); }

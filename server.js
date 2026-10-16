@@ -346,10 +346,20 @@ function createApplication(options = {}) {
     const player = room.players[playerIndex];
     socket.leave(room.id);
 
-    if (explicit && (room.status === "waiting" || room.status === "finished")) {
+    if (explicit) {
       cancelDisconnectCleanup(player);
+      const wasCurrentPlayer = room.status === "playing" && playerIndex === room.currentPlayerIndex;
+      if (wasCurrentPlayer) {
+        room.roundId += 1;
+        room.selectedCards = [];
+        room.isProcessing = false;
+        room.revealAll = false;
+        room.message = "";
+      }
       room.players.splice(playerIndex, 1);
+      if (playerIndex < room.currentPlayerIndex) room.currentPlayerIndex -= 1;
       if (room.currentPlayerIndex >= room.players.length) room.currentPlayerIndex = 0;
+      if (room.status === "playing" && room.players.length > 0) ensureCurrentConnected(room);
     } else {
       player.connected = false;
       player.rematch = false;

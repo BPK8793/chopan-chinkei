@@ -102,10 +102,13 @@
     </section>
 
     <section id="gameScreen" class="screen hidden">
-      <div class="game-topbar">
-        <div><span class="top-label">ROOM</span><strong id="gameRoomCode">----</strong></div>
-        <div class="turn-display"><span class="top-label">TURN</span><strong id="turnName">-</strong></div>
-        <div><span class="top-label">のこり</span><strong><span id="remainingPairs">17</span> ペア</strong></div>
+      <div class="game-toolbar">
+        <div class="game-topbar">
+          <div><span class="top-label">ROOM</span><strong id="gameRoomCode">----</strong></div>
+          <div class="turn-display"><span class="top-label">TURN</span><strong id="turnName">-</strong></div>
+          <div><span class="top-label">のこり</span><strong><span id="remainingPairs">17</span> ペア</strong></div>
+        </div>
+        <button id="quitGameButton" class="game-quit-button" type="button">ゲームをやめる</button>
       </div>
       <div id="gameProgress" class="game-progress" role="status" aria-live="polite">
         <span class="game-progress-badge"><i aria-hidden="true"></i>ゲーム進行中</span>
@@ -117,6 +120,16 @@
       <div id="revealTimer" class="reveal-timer hidden" aria-live="polite">全カード公開 <strong>3</strong></div>
       <div id="cardGrid" class="card-grid" aria-label="カード盤面"></div>
     </section>
+
+    <div id="quitGameModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="quitGameTitle">
+      <div class="modal-card panel quit-game-card">
+        <p class="eyebrow">LEAVE GAME</p>
+        <h2 id="quitGameTitle">ゲームをやめますか？</h2>
+        <p class="muted">ゲームから退出してトップ画面に戻ります。残ったプレイヤーはそのまま続けられます。</p>
+        <button id="confirmQuitGameButton" class="button primary" type="button">退出する</button>
+        <button id="cancelQuitGameButton" class="button secondary" type="button">ゲームに戻る</button>
+      </div>
+    </div>
 
     <div id="resultModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
       <div class="modal-card panel">

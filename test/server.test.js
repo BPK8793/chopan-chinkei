@@ -135,6 +135,38 @@ test("a waiting room remains joinable and watchable during a transient host disc
   assert.equal(resumed.players.find((player) => player.name === "ホスト").connected, true);
 });
 
+test("a player can explicitly leave during a game and immediately join another room", async (t) => {
+  const game = createApplication();
+  const address = await game.start();
+  const url = `http://127.0.0.1:${address.port}`;
+  t.after(() => game.close());
+  const host = await connect(url);
+  const guest = await connect(url);
+  t.after(() => { host.close(); guest.close(); });
+
+  const createdPromise = once(host, "roomCreated");
+  host.emit("createRoom", { name: "退出する人" });
+  const { roomId } = await createdPromise;
+  const joinedPromise = once(guest, "roomJoined");
+  guest.emit("joinRoom", { name: "続ける人", roomId });
+  await joinedPromise;
+  const startedPromise = once(host, "gameStarted");
+  host.emit("startGame");
+  await startedPromise;
+
+  const updatedPromise = once(guest, "roomUpdated");
+  host.emit("leaveRoom");
+  const updated = await updatedPromise;
+  assert.deepEqual(updated.players.map((player) => player.name), ["続ける人"]);
+  assert.equal(updated.currentPlayerId, guest.id, "the turn moves to the remaining player");
+  assert.equal(updated.hostId, guest.id, "host authority moves to the remaining player");
+
+  const nextRoomPromise = once(host, "roomCreated");
+  host.emit("createRoom", { name: "退出する人" });
+  const nextRoom = await nextRoomPromise;
+  assert.notEqual(nextRoom.roomId, roomId);
+});
+
 test("server rejects an out-of-turn flip and resolves a normal pair", async (t) => {
   const game = createApplication({ random: () => 0.23, failDelay: 10, jokerDelay: 15 });
   const address = await game.start();
