@@ -70,6 +70,7 @@
     button.type = "button";
     button.className = "memory-card";
     button.dataset.index = index;
+    button.dataset.cardId = card.id;
     const flipper = document.createElement("span");
     flipper.className = "card-flipper";
     flipper.append(createCardBack(), createCardFront(card));

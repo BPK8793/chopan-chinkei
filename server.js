@@ -311,6 +311,36 @@ function createApplication(options = {}) {
     return true;
   }
 
+  function removePlayerRecord(room, playerIndex) {
+    const player = room.players[playerIndex];
+    if (!player) return null;
+
+    const wasCurrentPlayer = room.status === "playing" && playerIndex === room.currentPlayerIndex;
+    if (wasCurrentPlayer) {
+      // Any pending pair/joker callback belongs to the departed player's turn.
+      room.roundId += 1;
+      room.selectedCards = [];
+      room.isProcessing = false;
+      room.revealAll = false;
+      room.revealEndsAt = null;
+      room.message = "";
+    }
+
+    room.players.splice(playerIndex, 1);
+    if (room.status === "orderSelection") {
+      const selected = room.orderCards.find((card) => card.chosenBy === player.id);
+      if (selected) selected.chosenBy = null;
+    }
+    room.turnOrder = room.turnOrder.filter((id) => id !== player.id);
+    if (playerIndex < room.currentPlayerIndex) room.currentPlayerIndex -= 1;
+    if (room.currentPlayerIndex >= room.players.length) room.currentPlayerIndex = 0;
+    if (room.status === "playing" && room.players.length > 0) ensureCurrentConnected(room);
+    if (room.hostSocketId === player.id && activePlayers(room).length > 0) {
+      room.hostSocketId = activePlayers(room)[0].id;
+    }
+    return player;
+  }
+
   function scheduleDisconnectCleanup(room, player) {
     cancelDisconnectCleanup(player);
     const timer = setTimeout(() => {
@@ -322,19 +352,15 @@ function createApplication(options = {}) {
       );
       if (playerIndex === -1 || currentRoom.players[playerIndex].connected) return;
 
-      if (["orderSelection", "orderResult", "playing"].includes(currentRoom.status)) {
-        closeEmptyRoom(currentRoom);
+      if (closeEmptyRoom(currentRoom)) return;
+      removePlayerRecord(currentRoom, playerIndex);
+      if (currentRoom.status === "orderSelection" && activePlayers(currentRoom).every((candidate) =>
+        currentRoom.orderCards.some((card) => card.chosenBy === candidate.id)
+      )) {
+        finishOrderSelection(currentRoom);
         return;
       }
-
-      const [removedPlayer] = currentRoom.players.splice(playerIndex, 1);
-      if (currentRoom.currentPlayerIndex >= currentRoom.players.length) {
-        currentRoom.currentPlayerIndex = 0;
-      }
-      if (currentRoom.hostSocketId === removedPlayer.id && activePlayers(currentRoom).length > 0) {
-        currentRoom.hostSocketId = activePlayers(currentRoom)[0].id;
-      }
-      if (!closeEmptyRoom(currentRoom)) broadcast(currentRoom);
+      broadcast(currentRoom);
     }, disconnectGraceMs);
     timer.unref?.();
     pendingDisconnects.set(player.resumeToken, timer);
@@ -439,23 +465,7 @@ function createApplication(options = {}) {
 
     if (explicit) {
       cancelDisconnectCleanup(player);
-      const wasCurrentPlayer = room.status === "playing" && playerIndex === room.currentPlayerIndex;
-      if (wasCurrentPlayer) {
-        room.roundId += 1;
-        room.selectedCards = [];
-        room.isProcessing = false;
-        room.revealAll = false;
-        room.revealEndsAt = null;
-        room.message = "";
-      }
-      room.players.splice(playerIndex, 1);
-      if (room.status === "orderSelection") {
-        const selected = room.orderCards.find((card) => card.chosenBy === player.id);
-        if (selected) selected.chosenBy = null;
-      }
-      if (playerIndex < room.currentPlayerIndex) room.currentPlayerIndex -= 1;
-      if (room.currentPlayerIndex >= room.players.length) room.currentPlayerIndex = 0;
-      if (room.status === "playing" && room.players.length > 0) ensureCurrentConnected(room);
+      removePlayerRecord(room, playerIndex);
     } else {
       player.connected = false;
       player.rematch = false;
@@ -474,7 +484,7 @@ function createApplication(options = {}) {
       closeEmptyRoom(room);
       return;
     }
-    if (room.hostSocketId === player.id && (explicit || room.status === "playing")) {
+    if (room.hostSocketId === player.id && room.status === "playing") {
       room.hostSocketId = activePlayers(room)[0].id;
     }
     if (room.status === "orderSelection" && activePlayers(room).every((candidate) =>
@@ -493,10 +503,13 @@ function createApplication(options = {}) {
       }
       const roomId = String(payload.roomId || "").trim();
       const room = rooms.get(roomId);
+      if (socket.data.watchRoomId) {
+        socket.leave(`watch:${socket.data.watchRoomId}`);
+        socket.data.watchRoomId = null;
+      }
       if (!/^\d{4}$/.test(roomId) || !room || !watchKeyMatches(room, payload.key)) {
         return socket.emit("watchUnavailable", { message: "観戦URLが無効です" });
       }
-      if (socket.data.watchRoomId) socket.leave(`watch:${socket.data.watchRoomId}`);
       socket.data.isWatcher = true;
       socket.data.watchRoomId = roomId;
       socket.join(`watch:${roomId}`);

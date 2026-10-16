@@ -20,11 +20,15 @@ const watchElement = (id) => document.getElementById(id);
 
 function renderWatchCards() {
   const grid = watchElement("watchCardGrid");
-  if (grid.children.length !== watchState.cards.length) grid.replaceChildren();
+  const existing = Array.from(grid.children);
+  const boardChanged = existing.length !== watchState.cards.length
+    || existing.some((button, index) => button.dataset.cardId !== watchState.cards[index]?.id);
+  if (boardChanged) grid.replaceChildren();
   watchState.cards.forEach((card, index) => {
     let button = grid.children[index];
     if (!button) {
       button = ChopanCardView.createCard(card, index, null);
+      button.dataset.cardId = card.id;
       button.tabIndex = -1;
       grid.append(button);
     }
@@ -126,6 +130,7 @@ function renderWatch(nextState, eventName = "roomUpdated") {
   document.body.classList.remove("watch-invalid");
   const previousState = watchState;
   watchSoundController?.handleGameEvent(eventName, nextState, previousState);
+  if (eventName === "gameStarted") watchElement("watchCardGrid").replaceChildren();
   watchState = nextState;
   watchElement("watchRoomCode").textContent = watchState.roomId;
   watchElement("watchRemainingPairs").textContent = watchState.remainingPairs;
@@ -176,6 +181,8 @@ watchSocket.on("disconnect", () => {
   status.classList.remove("hidden");
 });
 watchSocket.on("watchUnavailable", ({ message }) => {
+  clearInterval(watchRevealInterval);
+  watchRevealInterval = null;
   document.body.classList.add("watch-invalid");
   const status = watchElement("watchStatus");
   status.textContent = message;

@@ -223,6 +223,70 @@ test("start button is shown only to the waiting host and disappears on game star
   assert.equal(elements.get("effectMessage").classList.contains("hidden"), true);
 });
 
+test("each gameStarted event rebuilds player and watcher card elements", () => {
+  const firstRound = baseState({
+    status: "playing",
+    cards: [
+      { id: "goma-1-0", visible: false, matched: false },
+      { id: "rei-1-0", visible: false, matched: false }
+    ]
+  });
+  const secondRound = baseState({
+    status: "playing",
+    cards: [
+      { id: "chopa-4-1", visible: false, matched: false },
+      { id: "hagechopa-0", visible: false, matched: false }
+    ]
+  });
+
+  const playerUi = runBrowserScript("client.js", "host");
+  playerUi.socket.receive("gameStarted", firstRound);
+  const firstPlayerCards = [...playerUi.elements.get("cardGrid").children];
+  playerUi.socket.receive("gameStarted", secondRound);
+  const secondPlayerCards = [...playerUi.elements.get("cardGrid").children];
+  assert.equal(secondPlayerCards.length, 2);
+  assert.notEqual(secondPlayerCards[0], firstPlayerCards[0]);
+  assert.notEqual(secondPlayerCards[1], firstPlayerCards[1]);
+
+  const watcherUi = runBrowserScript("watch.js", "watcher", { pathname: "/watch/1234", search: "?key=secret" });
+  watcherUi.socket.receive("gameStarted", firstRound);
+  const firstWatcherCards = [...watcherUi.elements.get("watchCardGrid").children];
+  watcherUi.socket.receive("gameStarted", secondRound);
+  const secondWatcherCards = [...watcherUi.elements.get("watchCardGrid").children];
+  assert.equal(secondWatcherCards.length, 2);
+  assert.notEqual(secondWatcherCards[0], firstWatcherCards[0]);
+  assert.notEqual(secondWatcherCards[1], firstWatcherCards[1]);
+});
+
+test("a changed board identity rebuilds cards even on a generic state update", () => {
+  const firstRound = baseState({
+    status: "playing",
+    cards: [
+      { id: "goma-1-0", visible: false, matched: false },
+      { id: "rei-1-0", visible: false, matched: false }
+    ]
+  });
+  const secondRound = baseState({
+    status: "playing",
+    cards: [
+      { id: "chopa-4-1", visible: false, matched: false },
+      { id: "hagechopa-0", visible: false, matched: false }
+    ]
+  });
+
+  const playerUi = runBrowserScript("client.js", "host");
+  playerUi.socket.receive("gameStarted", firstRound);
+  const firstPlayerCard = playerUi.elements.get("cardGrid").children[0];
+  playerUi.socket.receive("roomUpdated", secondRound);
+  assert.notEqual(playerUi.elements.get("cardGrid").children[0], firstPlayerCard);
+
+  const watcherUi = runBrowserScript("watch.js", "watcher", { pathname: "/watch/1234", search: "?key=secret" });
+  watcherUi.socket.receive("gameStarted", firstRound);
+  const firstWatcherCard = watcherUi.elements.get("watchCardGrid").children[0];
+  watcherUi.socket.receive("roomUpdated", secondRound);
+  assert.notEqual(watcherUi.elements.get("watchCardGrid").children[0], firstWatcherCard);
+});
+
 test("start button stays hidden for a non-host and hides immediately after host click", () => {
   const guestUi = runBrowserScript("client.js", "guest");
   guestUi.socket.receive("roomCreated", baseState());
@@ -416,7 +480,7 @@ test("sound events use the replaceable mp3 paths only after user interaction", (
     "/sounds/flip.mp3",
     "/sounds/match.mp3",
     "/sounds/miss.mp3",
-    "/sounds/joker.mp3",
+    "/sounds/hgsound.mp3",
     "/sounds/finish.mp3"
   ]);
 });
@@ -437,44 +501,15 @@ test("turn speech runs once when an opponent hands the turn to this player", () 
   assert.equal(spoken[0].rate, 1.3125);
 });
 
-test("joker chance uses one slower and higher special announcement", () => {
-  const { controller, documentListeners, spoken } = runSoundManager();
+test("joker chance uses the dedicated mp3 without synthesized speech", () => {
+  const { controller, documentListeners, played, spoken } = runSoundManager();
   documentListeners.get("pointerdown")();
   const before = baseState({ status: "playing", revealAll: false });
   const activated = baseState({ status: "playing", revealAll: true });
 
   controller.handleGameEvent("jokerActivated", activated, before, { selfId: "guest" });
-  controller.handleGameEvent("jokerActivated", activated, activated, { selfId: "guest" });
-  controller.handleGameEvent("roomUpdated", activated, activated, { selfId: "guest" });
-
-  assert.equal(spoken.length, 1);
-  assert.equal(spoken[0].text, "ハゲチョパ、チャーーーンス！");
-  assert.equal(spoken[0].lang, "ja-JP");
-  assert.equal(spoken[0].rate, 0.9);
-  assert.equal(spoken[0].pitch, 1.18);
-  assert.equal(spoken[0].volume, 0.55);
-});
-
-test("joker announcement follows effects even when turn speech is off", () => {
-  const { controller, documentListeners, elements, spoken } = runSoundManager("watch");
-  documentListeners.get("pointerdown")();
-  controller.handleGameEvent(
-    "jokerActivated",
-    baseState({ status: "playing", revealAll: true }),
-    baseState({ status: "playing", revealAll: false })
-  );
-  assert.equal(controller.settings.speech, false);
-  assert.equal(spoken.length, 1);
-
-  const effects = elements.get("soundEffectsEnabled");
-  effects.checked = false;
-  effects.listeners.get("change")();
-  controller.handleGameEvent(
-    "jokerActivated",
-    baseState({ status: "playing", revealAll: true }),
-    baseState({ status: "playing", revealAll: false })
-  );
-  assert.equal(spoken.length, 1);
+  assert.deepEqual(played, ["/sounds/hgsound.mp3"]);
+  assert.equal(spoken.length, 0);
 });
 
 test("joker countdown ticks once per displayed second and respects mute", () => {
@@ -518,7 +553,7 @@ test("sound controls persist mute, speech, and volume per screen mode", () => {
 });
 
 test("all requested mp3 assets and audio controls are present", () => {
-  for (const filename of ["flip.mp3", "match.mp3", "miss.mp3", "joker.mp3", "finish.mp3"]) {
+  for (const filename of ["flip.mp3", "match.mp3", "miss.mp3", "hgsound.mp3", "finish.mp3"]) {
     assert.ok(fs.statSync(path.join(__dirname, "..", "public", "sounds", filename)).size > 1000);
   }
   const playerHtml = fs.readFileSync(path.join(__dirname, "..", "public", "index.html"), "utf8");

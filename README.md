@@ -35,6 +35,8 @@ npm test
 
 ## 観戦・OBS配信
 
+ゲーム開始とOBS用観戦開始の詳細仕様は、[`docs/game-start-and-obs-spec.md`](docs/game-start-and-obs-spec.md)を参照してください。
+
 ルーム作成者の待機画面・ゲーム画面に表示されるボタンから、ランダムな観戦専用キー付きURLをコピーできます。
 
 ```text

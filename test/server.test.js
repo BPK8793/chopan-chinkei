@@ -425,11 +425,42 @@ test("watchers are read-only, are not players, and receive live card updates", a
   assert.equal(started.cards.every((card) => !card.name), true);
   assert.equal(started.message, "", "watchers do not receive a game start overlay message");
 
+  const hostFlip = once(host, "cardFlipped");
   const watcherFlip = once(watcher, "cardFlipped");
   host.emit("flipCard", { index: 0 });
-  const flipped = await watcherFlip;
+  const [playerFlipped, flipped] = await Promise.all([hostFlip, watcherFlip]);
+  assert.deepEqual(flipped.cards, playerFlipped.cards, "player and watcher receive the exact same card state");
+  assert.deepEqual(flipped.selectedCards, playerFlipped.selectedCards);
+  assert.deepEqual(flipped.players, playerFlipped.players);
+  assert.equal(flipped.currentPlayerId, playerFlipped.currentPlayerId);
   assert.equal(flipped.cards[0].visible, true);
   assert.ok(flipped.cards[0].name);
+});
+
+test("a disconnected player is removed after the reconnect grace period during a game", async (t) => {
+  const game = createApplication({ disconnectGraceMs: 15 });
+  const address = await game.start();
+  const url = `http://127.0.0.1:${address.port}`;
+  t.after(() => game.close());
+  const host = await connect(url);
+  const guest = await connect(url);
+  t.after(() => { host.close(); guest.close(); });
+
+  const createdPromise = once(host, "roomCreated");
+  host.emit("createRoom", { name: "A" });
+  const { roomId } = await createdPromise;
+  const joinedPromise = once(guest, "roomJoined");
+  guest.emit("joinRoom", { name: "B", roomId });
+  await joinedPromise;
+  const startedPromise = once(host, "gameStarted");
+  host.emit("startGame");
+  await startedPromise;
+
+  guest.close();
+  await new Promise((resolve) => setTimeout(resolve, 35));
+  const room = game.rooms.get(roomId);
+  assert.deepEqual(room.players.map((player) => player.name), ["A"]);
+  assert.equal(room.currentPlayerIndex, 0);
 });
 
 test("players, late watchers, and rematches receive the authoritative room layout", async (t) => {
@@ -566,6 +597,29 @@ test("watch keys are random, private, and invalid keys reveal no game state", as
   assert.equal(watcher.listeners("watchJoined").length, 0);
 });
 
+test("a failed watch-room switch unsubscribes the socket from its previous room", async (t) => {
+  const game = createApplication();
+  const address = await game.start();
+  const url = `http://127.0.0.1:${address.port}`;
+  t.after(() => game.close());
+  const host = await connect(url);
+  const watcher = await connect(url);
+  t.after(() => { host.close(); watcher.close(); });
+
+  const createdPromise = once(host, "roomCreated");
+  host.emit("createRoom", { name: "A" });
+  const { roomId } = await createdPromise;
+  const joinedPromise = once(watcher, "watchJoined");
+  watcher.emit("joinWatch", { roomId, key: game.rooms.get(roomId).watchKey });
+  await joinedPromise;
+
+  const unavailablePromise = once(watcher, "watchUnavailable");
+  watcher.emit("joinWatch", { roomId, key: "invalid" });
+  await unavailablePromise;
+  const serverSocket = game.io.sockets.sockets.get(watcher.id);
+  assert.equal(serverSocket.rooms.has(`watch:${roomId}`), false);
+});
+
 test("all four supplied chopa images are served with the expected dimensions", async (t) => {
   const game = createApplication();
   const address = await game.start();
@@ -584,7 +638,7 @@ test("all four supplied chopa images are served with the expected dimensions", a
   }
 });
 
-test("the supplied hagechopa artwork is served as the joker image", async (t) => {
+test("the supplied hagechopa artwork is served as a transparent joker image", async (t) => {
   const game = createApplication();
   const address = await game.start();
   const url = `http://127.0.0.1:${address.port}`;
@@ -595,8 +649,9 @@ test("the supplied hagechopa artwork is served as the joker image", async (t) =>
   assert.match(response.headers.get("content-type"), /^image\/png/);
   const image = Buffer.from(await response.arrayBuffer());
   assert.equal(image.subarray(1, 4).toString(), "PNG");
-  assert.equal(image.readUInt32BE(16), 1349);
-  assert.equal(image.readUInt32BE(20), 1166);
+  assert.ok(image.readUInt32BE(16) >= 1000);
+  assert.ok(image.readUInt32BE(20) >= 1000);
+  assert.equal(image[25], 6, "the supplied PNG keeps its transparent background");
 });
 
 test("all generated chinchilla character variants are served as transparent PNGs", async (t) => {

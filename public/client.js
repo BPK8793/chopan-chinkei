@@ -83,6 +83,8 @@ function renderPlayersBar() {
 }
 
 function renderLobby() {
+  clearInterval(orderInterval);
+  orderInterval = null;
   showScreen($("roomScreen"));
   $("roomCode").textContent = state.roomId;
   $("playerCount").textContent = `${state.players.length} / 4人`;
@@ -114,6 +116,8 @@ function renderLobby() {
 }
 
 function renderGame() {
+  clearInterval(orderInterval);
+  orderInterval = null;
   showScreen($("gameScreen"));
   $("orderGame").classList.add("hidden");
   $("cardGrid").classList.remove("hidden");
@@ -136,13 +140,16 @@ function renderGame() {
 
   const canFlip = state.currentPlayerId === socket.id && !state.isProcessing && !state.revealAll;
   const existing = Array.from($("cardGrid").children);
-  if (existing.length !== state.cards.length) $("cardGrid").replaceChildren();
+  const boardChanged = existing.length !== state.cards.length
+    || existing.some((button, index) => button.dataset.cardId !== state.cards[index]?.id);
+  if (boardChanged) $("cardGrid").replaceChildren();
   state.cards.forEach((card, index) => {
     let button = $("cardGrid").children[index];
     if (!button) {
       button = ChopanCardView.createCard(card, index, (cardIndex) => {
         socket.emit("flipCard", { index: cardIndex });
       });
+      button.dataset.cardId = card.id;
       $("cardGrid").append(button);
     }
     ChopanCardView.updateCard(button, card, index, canFlip);
@@ -275,6 +282,7 @@ function applyState(next, eventName = "roomUpdated") {
   const previousState = state;
   saveResumeCredentials(next);
   soundController?.handleGameEvent(eventName, next, previousState, { selfId: socket.id });
+  if (eventName === "gameStarted") $("cardGrid").replaceChildren();
   state = next;
   if (state.status !== "waiting") {
     $("startButton").classList.add("hidden");
