@@ -267,6 +267,19 @@ test("card back uses one shared 180-degree symmetric design in every game view",
   assert.match(watcher, /ChopanCardView\.createCard/);
 });
 
+test("card fronts use high-contrast character palettes and enlarged corner identifiers", () => {
+  const styles = fs.readFileSync(path.join(__dirname, "..", "public", "style.css"), "utf8");
+
+  assert.match(styles, /\.card-front\.goma\s*{[^}]*--card-accent:\s*#1776dc[^}]*--card-symbol:\s*"♠"/s);
+  assert.match(styles, /\.card-front\.rei\s*{[^}]*--card-accent:\s*#df354f[^}]*--card-symbol:\s*"♥"/s);
+  assert.match(styles, /\.card-front\.guri\s*{[^}]*--card-accent:\s*#1d9a50[^}]*--card-symbol:\s*"♣"/s);
+  assert.match(styles, /\.card-front\.chopa\s*{[^}]*--card-accent:\s*#f2a20c[^}]*--card-symbol:\s*"♦"/s);
+  assert.match(styles, /\.card-front\.hagechopa\s*{[^}]*--card-accent:\s*#7b35ad[^}]*--card-light:\s*#e6c262[^}]*--card-symbol:\s*"★"/s);
+  assert.match(styles, /\.card-front\.has-image \.card-corner\s*{[^}]*min-width:\s*30%[^}]*background:\s*rgba\(255,255,255,\.96\)/s);
+  assert.match(styles, /\.card-front\.has-image \.card-corner b\s*{[^}]*font-size:\s*clamp\(17px,\s*2\.35vw,\s*29px\)/s);
+  assert.match(styles, /\.card-front\.has-image \.card-corner i\s*{[^}]*font-size:\s*clamp\(16px,\s*2\.05vw,\s*25px\)/s);
+});
+
 test("all four chopa fronts prefer their numbered image and keep text as fallback", () => {
   const { document } = createDom();
   const window = {};

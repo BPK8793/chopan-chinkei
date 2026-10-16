@@ -175,84 +175,165 @@ input:focus { border-color: var(--pink); box-shadow: 0 0 0 4px #fbe1e8; }
     repeating-conic-gradient(from 0deg, #fbd4de 0 15deg, #dc6f8b 15deg 30deg);
   box-shadow: 0 0 0 4px rgba(202,76,108,.72), 0 0 0 7px rgba(255,255,255,.7);
 }
-.card-front { transform: rotateY(180deg); border: 2px solid #eadfe2; background: white; box-shadow: 0 5px 12px rgba(93,65,73,.12); }
-.card-front.goma { --card-accent: #6f6a69; --card-light: #eeeae8; }
-.card-front.rei { --card-accent: #e37691; --card-light: #ffedf2; }
-.card-front.guri { --card-accent: #64ae90; --card-light: #e5f6ef; }
-.card-front.chopa { --card-accent: #9475c0; --card-light: #eee8fa; }
-.card-front.hagechopa { --card-accent: #d89b34; --card-light: #fff3ca; }
-.card-front { color: var(--card-accent); background: linear-gradient(155deg, white, var(--card-light)); }
+.card-front {
+  --card-accent: #26313d;
+  --card-deep: #121922;
+  --card-light: #e8edf2;
+  --card-symbol: "?";
+  transform: rotateY(180deg);
+  border: 3px solid var(--card-deep);
+  color: var(--card-deep);
+  background:
+    linear-gradient(135deg, rgba(255,255,255,.2), transparent 42%),
+    linear-gradient(160deg, var(--card-light), var(--card-accent));
+  box-shadow: 0 5px 12px rgba(28,35,43,.28), inset 0 0 0 2px rgba(255,255,255,.68);
+}
+.card-front.goma {
+  --card-accent: #1776dc;
+  --card-deep: #083f87;
+  --card-light: #b9dcff;
+  --card-symbol: "♠";
+}
+.card-front.rei {
+  --card-accent: #df354f;
+  --card-deep: #94152b;
+  --card-light: #ffc1ca;
+  --card-symbol: "♥";
+}
+.card-front.guri {
+  --card-accent: #1d9a50;
+  --card-deep: #075f30;
+  --card-light: #a8e5bd;
+  --card-symbol: "♣";
+}
+.card-front.chopa {
+  --card-accent: #f2a20c;
+  --card-deep: #914600;
+  --card-light: #ffe07a;
+  --card-symbol: "♦";
+}
+.card-front.hagechopa {
+  --card-accent: #7b35ad;
+  --card-deep: #3e1265;
+  --card-light: #e6c262;
+  --card-symbol: "★";
+}
+.card-front::before {
+  content: var(--card-symbol);
+  position: absolute;
+  z-index: 0;
+  top: 50%;
+  right: -4%;
+  transform: translateY(-50%);
+  color: rgba(255,255,255,.32);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(44px, 7vw, 86px);
+  font-weight: 900;
+  line-height: 1;
+}
 .card-fallback { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.card-name { font-size: clamp(10px, 1.5vw, 16px); font-weight: 900; }
-.card-mark { font-size: clamp(21px, 3.2vw, 39px); line-height: 1.15; }
-.card-number { font-weight: 900; }
+.card-name { font-size: clamp(11px, 1.5vw, 17px); font-weight: 900; }
+.card-mark { font-size: clamp(31px, 4.5vw, 55px); font-weight: 900; line-height: 1; }
+.card-number { font-size: clamp(17px, 2.3vw, 28px); font-weight: 1000; line-height: 1; }
 .card-image { width: 100%; height: 100%; padding: 5%; object-fit: contain; }
-.card-front.has-image { background: white; }
+.card-front.has-image {
+  background:
+    linear-gradient(90deg, transparent 0 82%, rgba(255,255,255,.13) 82% 100%),
+    linear-gradient(135deg, rgba(255,255,255,.32), transparent 45%),
+    linear-gradient(160deg, var(--card-light), var(--card-accent));
+}
 .card-front.goma.has-image {
   background:
-    radial-gradient(circle at 25% 25%, rgba(255,255,255,.72) 0 3%, transparent 3.5%),
-    radial-gradient(circle at 75% 75%, rgba(255,255,255,.72) 0 3%, transparent 3.5%),
-    linear-gradient(145deg, #eef5ff, #dceafd);
+    linear-gradient(90deg, transparent 0 82%, rgba(255,255,255,.16) 82% 100%),
+    radial-gradient(circle at 48% 48%, #eaf5ff 0 34%, rgba(205,231,255,.92) 50%, transparent 72%),
+    linear-gradient(155deg, #84c2ff, #1671d2);
 }
 .card-front.rei.has-image {
   background:
-    radial-gradient(circle at 25% 25%, rgba(255,255,255,.72) 0 3%, transparent 3.5%),
-    radial-gradient(circle at 75% 75%, rgba(255,255,255,.72) 0 3%, transparent 3.5%),
-    linear-gradient(145deg, #fff3f7, #fbdde7);
+    linear-gradient(90deg, transparent 0 82%, rgba(255,255,255,.16) 82% 100%),
+    radial-gradient(circle at 48% 48%, #fff1f3 0 34%, rgba(255,200,210,.94) 50%, transparent 72%),
+    linear-gradient(155deg, #ff8e9f, #d82d48);
 }
 .card-front.guri.has-image {
   background:
-    radial-gradient(circle at 25% 25%, rgba(255,255,255,.72) 0 3%, transparent 3.5%),
-    radial-gradient(circle at 75% 75%, rgba(255,255,255,.72) 0 3%, transparent 3.5%),
-    linear-gradient(145deg, #f0fbf5, #d8f0e3);
+    linear-gradient(90deg, transparent 0 82%, rgba(255,255,255,.16) 82% 100%),
+    radial-gradient(circle at 48% 48%, #eefbf2 0 34%, rgba(188,233,202,.94) 50%, transparent 72%),
+    linear-gradient(155deg, #72cf91, #168345);
 }
 .card-front.chopa.has-image {
   background:
-    radial-gradient(circle at 50% 45%, rgba(255,255,255,.98) 0 34%, rgba(247,239,253,.96) 68%, #eadff7 100%);
+    linear-gradient(90deg, transparent 0 82%, rgba(255,255,255,.16) 82% 100%),
+    radial-gradient(circle at 48% 48%, #fff8d6 0 34%, rgba(255,224,122,.94) 50%, transparent 72%),
+    linear-gradient(155deg, #ffc846, #eb8b00);
+}
+.card-front.hagechopa.has-image {
+  background:
+    linear-gradient(90deg, transparent 0 82%, rgba(255,255,255,.18) 82% 100%),
+    radial-gradient(circle at 48% 48%, #f8edbf 0 34%, rgba(222,190,91,.94) 50%, transparent 72%),
+    linear-gradient(155deg, #a25bd1, #4f1977);
 }
 .card-front.has-image .card-image {
-  padding: 10% 3% 13%;
+  position: relative;
+  z-index: 1;
+  padding: 11% 5% 15%;
   object-fit: contain;
   object-position: center;
 }
 .card-front.chopa .card-image {
-  padding: 9% 1% 12%;
+  padding: 11% 3% 15%;
   object-fit: contain;
   object-position: center;
-  transform: scale(1.04);
-  filter: drop-shadow(0 3px 3px rgba(74,54,87,.12));
+  filter: drop-shadow(0 3px 3px rgba(74,54,87,.24));
+}
+.card-front.hagechopa .card-image {
+  margin: 12% 7% 16%;
+  width: 86%;
+  height: 72%;
+  padding: 0;
+  border: 3px solid #f8d977;
+  border-radius: 10px;
+  background: #5a1d7d;
+  box-shadow: 0 0 0 2px #43105f, 0 5px 10px rgba(37,9,54,.35);
 }
 .card-corner, .card-image-name { display: none; }
 .card-front.has-image .card-corner {
   position: absolute;
-  z-index: 2;
+  z-index: 3;
   display: grid;
   place-items: center;
-  min-width: 18%;
+  min-width: 30%;
+  padding: 5% 4% 4%;
+  border: 2px solid var(--card-deep);
+  border-radius: 0 0 11px 0;
   color: var(--card-accent);
+  background: rgba(255,255,255,.96);
+  box-shadow: 0 2px 7px rgba(14,22,31,.26);
   font-style: normal;
   font-weight: 900;
-  line-height: .85;
-  text-shadow: 0 1px 0 white, 0 0 4px white;
+  line-height: .76;
+  text-shadow: none;
 }
-.card-front.has-image .card-corner b { font-size: clamp(11px, 1.45vw, 18px); }
-.card-front.has-image .card-corner i { margin-top: 3px; font-size: clamp(9px, 1.2vw, 15px); font-style: normal; }
-.card-corner.top-left { top: 5%; left: 3%; }
-.card-corner.bottom-right { right: 3%; bottom: 5%; transform: rotate(180deg); }
+.card-front.has-image .card-corner b { font-size: clamp(17px, 2.35vw, 29px); font-weight: 1000; }
+.card-front.has-image .card-corner i { margin-top: 5px; font-size: clamp(16px, 2.05vw, 25px); font-style: normal; font-weight: 900; }
+.card-front.hagechopa.has-image .card-corner i { font-size: clamp(7px, .85vw, 11px); letter-spacing: -.05em; }
+.card-corner.top-left { top: -2px; left: -2px; }
+.card-corner.bottom-right { right: -2px; bottom: -2px; transform: rotate(180deg); }
+.card-front.has-image .card-corner.bottom-right { border-radius: 0 0 11px 0; }
 .card-front.has-image .card-image-name {
   position: absolute;
-  z-index: 2;
-  left: 23%;
-  right: 23%;
-  bottom: 4%;
+  z-index: 3;
+  left: 27%;
+  right: 27%;
+  bottom: 3%;
   display: block;
   overflow: hidden;
-  padding: 2px 5px;
-  border-radius: 999px;
-  color: var(--card-accent);
-  background: rgba(255,255,255,.88);
-  box-shadow: 0 1px 5px rgba(74,54,87,.1);
-  font-size: clamp(8px, 1vw, 12px);
+  padding: 3px 4px;
+  border: 1px solid rgba(255,255,255,.86);
+  border-radius: 7px;
+  color: white;
+  background: var(--card-deep);
+  box-shadow: 0 2px 6px rgba(14,22,31,.3);
+  font-size: clamp(9px, 1.05vw, 13px);
   font-weight: 900;
   line-height: 1.15;
   text-align: center;
