@@ -464,3 +464,203 @@ html.obs-page, html.obs-page body { width: 100%; height: 100%; overflow: hidden;
 @media (max-width: 820px), (max-height: 650px) {
   .obs-mode .watch-card-grid { grid-template-columns: repeat(9, minmax(0, 1fr)); }
 }
+
+/* PCのゲーム画面はヘッダーと34枚のカードを1画面内に収める。 */
+@media (min-width: 821px) {
+  body.game-active,
+  .watch-body {
+    --desktop-card-width: clamp(74px, calc((100dvh - 370px) * .1875), 116px);
+    --desktop-card-gap: clamp(6px, .75vh, 10px);
+    --desktop-board-padding: clamp(36px, 4vh, 44px);
+  }
+
+  body.game-active {
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  body.game-active .app-shell {
+    width: min(1320px, 100%);
+    height: 100vh;
+    height: 100dvh;
+    padding: clamp(8px, 1.4vh, 15px) 24px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  body.game-active .brand {
+    flex: 0 0 auto;
+    margin-bottom: clamp(6px, 1vh, 10px);
+  }
+
+  body.game-active .brand-mark {
+    width: clamp(40px, 4.6vh, 48px);
+    height: clamp(40px, 4.6vh, 48px);
+    border-radius: 15px;
+    font-size: 23px;
+  }
+
+  body.game-active #gameScreen {
+    min-height: 0;
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+  }
+
+  body.game-active .game-topbar {
+    min-height: clamp(52px, 5.7vh, 62px);
+    padding: 8px 18px;
+  }
+
+  body.game-active .game-progress {
+    margin-top: clamp(6px, .8vh, 9px);
+    padding: 7px 14px;
+  }
+
+  body.game-active .players-bar {
+    margin: clamp(6px, .8vh, 9px) 0;
+  }
+
+  body.game-active .score-chip,
+  .watch-body .score-chip {
+    padding: 5px 10px;
+  }
+
+  body.game-active .card-grid,
+  .watch-body .watch-card-grid {
+    width: auto;
+    max-width: 100%;
+    max-height: 100%;
+    padding: var(--desktop-board-padding);
+    grid-template-columns: repeat(9, var(--desktop-card-width));
+    gap: var(--desktop-card-gap);
+    align-content: center;
+    justify-content: center;
+  }
+
+  body.game-active .card-grid {
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+
+  .watch-body {
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .watch-shell {
+    width: min(1320px, 100%);
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    padding: clamp(8px, 1.4vh, 15px) 24px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .watch-controls {
+    flex: 0 0 auto;
+    margin-bottom: clamp(7px, 1vh, 11px);
+    padding: 7px 12px;
+  }
+
+  .watch-header {
+    flex: 0 0 auto;
+    margin-bottom: 6px;
+  }
+
+  .watch-stats {
+    min-height: clamp(52px, 5.6vh, 60px);
+    padding: 7px 16px;
+  }
+
+  .watch-progress {
+    flex: 0 0 auto;
+    margin-top: 6px;
+    padding: 7px 14px;
+  }
+
+  .watch-players {
+    flex: 0 0 auto;
+    margin: clamp(6px, .8vh, 9px) 0;
+  }
+
+  .watch-body .watch-card-grid {
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+
+  .memory-card {
+    container-type: inline-size;
+  }
+
+  .card-front.has-image .card-corner b {
+    font-size: clamp(16px, 22cqi, 24px);
+  }
+
+  .card-front.has-image .card-corner i {
+    margin-top: 3px;
+    font-size: clamp(14px, 19cqi, 21px);
+  }
+
+  .card-front.hagechopa.has-image .card-corner i {
+    font-size: clamp(7px, 8cqi, 10px);
+  }
+
+  .card-front.has-image .card-image-name {
+    font-size: clamp(8px, 10cqi, 11px);
+  }
+
+  .obs-mode .watch-shell {
+    padding: 8px 12px;
+  }
+
+  .obs-mode .watch-card-grid {
+    width: auto;
+    max-height: 100%;
+    padding: var(--desktop-board-padding);
+    grid-template-columns: repeat(9, var(--desktop-card-width));
+    gap: var(--desktop-card-gap);
+  }
+}
+
+@media (min-width: 821px) and (max-height: 850px) {
+  .memory-card {
+    transform: translate(var(--card-x-compact, 0), var(--card-y-compact, 0)) rotate(var(--card-rotation-compact, 0));
+  }
+
+  .memory-card:not(:disabled):hover {
+    transform: translate(var(--card-x-compact, 0), calc(var(--card-y-compact, 0) - 2px)) rotate(var(--card-rotation-compact, 0));
+  }
+}
+
+/* 極端に低い画面ではカードの判読性を守り、必要な分だけ縦スクロールを許可する。 */
+@media (min-width: 821px) and (max-height: 699px) {
+  body.game-active,
+  .watch-body:not(.obs-mode) {
+    height: auto;
+    min-height: 100vh;
+    overflow-y: auto;
+  }
+
+  body.game-active .app-shell,
+  .watch-body:not(.obs-mode) .watch-shell {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  body.game-active #gameScreen,
+  .watch-body:not(.obs-mode) .watch-card-grid {
+    flex: 0 0 auto;
+  }
+
+  body.game-active .card-grid,
+  .watch-body:not(.obs-mode) .watch-card-grid {
+    max-height: none;
+  }
+}

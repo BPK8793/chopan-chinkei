@@ -23,6 +23,7 @@ function clearResumeCredentials() {
 
 function showScreen(screen) {
   screens.forEach((item) => item.classList.toggle("hidden", item !== screen));
+  document.body.classList.toggle("game-active", screen === $("gameScreen"));
 }
 
 function showToast(message) {

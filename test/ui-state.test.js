@@ -60,6 +60,8 @@ class FakeSocket {
 
 function createDom() {
   const elements = new Map();
+  const body = new FakeElement("body");
+  elements.set("body", body);
   const getElementById = (id) => {
     if (!elements.has(id)) elements.set(id, new FakeElement(id));
     return elements.get(id);
@@ -71,7 +73,7 @@ function createDom() {
   return {
     elements,
     document: {
-      body: new FakeElement("body"),
+      body,
       createElement: () => new FakeElement(),
       createTextNode: (text) => ({ textContent: text }),
       getElementById
@@ -139,6 +141,7 @@ test("start button is shown only to the waiting host and disappears on game star
   socket.receive("gameStarted", baseState({ status: "playing" }));
   assert.equal(startButton.classList.contains("hidden"), true);
   assert.equal(startButton.disabled, true);
+  assert.equal(elements.get("body").classList.contains("game-active"), true);
   assert.equal(elements.get("roomScreen").classList.contains("hidden"), true);
   assert.equal(elements.get("gameScreen").classList.contains("hidden"), false);
   assert.equal(elements.get("currentTurnStatus").textContent, "現在のターン：あなた");
@@ -264,6 +267,9 @@ test("card placement transforms the clickable card while flip animation stays on
   assert.equal(button.style.values.get("--card-rotation"), "8deg");
   assert.equal(button.style.values.get("--card-x-mobile"), "10.8px");
   assert.equal(button.style.values.get("--card-rotation-mobile"), "4.8deg");
+  assert.ok(Math.abs(Number.parseFloat(button.style.values.get("--card-x-compact")) - 16.8) < 0.001);
+  assert.equal(button.style.values.get("--card-y-compact"), "-12.6px");
+  assert.equal(button.style.values.get("--card-rotation-compact"), "6.4deg");
   assert.equal(button.style.zIndex, "12");
   assert.equal(button.disabled, false);
   button.click();
