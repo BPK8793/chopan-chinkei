@@ -371,6 +371,21 @@ test("all four supplied chopa images are served with the expected dimensions", a
   }
 });
 
+test("the supplied hagechopa artwork is served as the joker image", async (t) => {
+  const game = createApplication();
+  const address = await game.start();
+  const url = `http://127.0.0.1:${address.port}`;
+  t.after(() => game.close());
+
+  const response = await fetch(`${url}/images/hagechopa/hagechopa_joker.png`);
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type"), /^image\/png/);
+  const image = Buffer.from(await response.arrayBuffer());
+  assert.equal(image.subarray(1, 4).toString(), "PNG");
+  assert.equal(image.readUInt32BE(16), 1349);
+  assert.equal(image.readUInt32BE(20), 1166);
+});
+
 test("all generated chinchilla character variants are served as transparent PNGs", async (t) => {
   const game = createApplication();
   const address = await game.start();
