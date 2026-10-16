@@ -42,6 +42,14 @@ button { touch-action: manipulation; }
 
 .app-shell { position: relative; width: min(1180px, 100%); margin: 0 auto; padding: 22px 24px 36px; }
 .brand { display: flex; align-items: center; gap: 13px; margin-bottom: 22px; }
+.sound-settings { position: fixed; z-index: 40; top: 18px; right: 18px; width: min(260px, calc(100vw - 36px)); padding: 9px 13px; background: rgba(255,254,253,.96); }
+.sound-settings summary { cursor: pointer; color: var(--pink-dark); font-size: 13px; font-weight: 900; user-select: none; }
+.sound-settings-content { display: grid; gap: 9px; padding-top: 11px; }
+.sound-settings-content label { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 12px; }
+.sound-settings-content input[type="checkbox"] { width: 18px; min-height: 18px; accent-color: var(--pink-dark); }
+.sound-settings-content input[type="range"] { min-height: 24px; padding: 0; border: 0; box-shadow: none; accent-color: var(--pink-dark); }
+.sound-volume { display: grid !important; grid-template-columns: auto 1fr auto; }
+.sound-volume output { min-width: 34px; color: var(--muted); font-size: 11px; text-align: right; }
 .brand-mark { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 18px; color: white; background: var(--pink); font-size: 26px; transform: rotate(-7deg); box-shadow: 0 8px 18px #efb3c1; }
 .eyebrow { margin: 0 0 3px; font-size: 11px; font-weight: 800; letter-spacing: .16em; color: var(--pink-dark); }
 h1 { margin: 0; font-size: clamp(22px, 3vw, 32px); line-height: 1; letter-spacing: -.04em; }
@@ -409,6 +417,7 @@ input:focus { border-color: var(--pink); box-shadow: 0 0 0 4px #fbe1e8; }
 /* OBS・配信用の読み取り専用レイアウト */
 .watch-body { min-height: 100vh; overflow-x: hidden; background: linear-gradient(145deg, #fffaf3, #fff0f4); }
 .watch-shell { width: min(1220px, 100%); min-height: 100vh; margin: 0 auto; padding: clamp(12px, 2vw, 24px); }
+.watch-sound-settings { position: fixed; }
 .watch-controls { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 18px; margin-bottom: 16px; padding: 10px 14px; border-radius: 16px; background: rgba(255,255,255,.82); }
 .watch-controls p { margin: 0; color: var(--muted); font-size: 12px; text-align: center; }
 .watch-back { text-decoration: none; }
@@ -442,6 +451,9 @@ html.obs-page, html.obs-page body { width: 100%; height: 100%; overflow: hidden;
 .obs-mode .watch-status { margin: auto; flex: 0 0 auto; }
 .obs-mode .watch-result { inset: auto 16px 16px auto; width: min(430px, 30vw); }
 .obs-mode .effect-message { font-size: clamp(34px, 4vw, 68px); }
+.obs-mode .watch-sound-settings { top: 7px; right: 8px; width: 116px; padding: 6px 9px; opacity: .72; }
+.obs-mode .watch-sound-settings[open] { width: 230px; opacity: .96; }
+.obs-mode .watch-sound-settings summary { font-size: 11px; }
 
 @media (max-width: 820px) {
   .watch-controls { grid-template-columns: 1fr auto; }
@@ -453,6 +465,7 @@ html.obs-page, html.obs-page body { width: 100%; height: 100%; overflow: hidden;
 }
 
 @media (max-width: 560px) {
+  .sound-settings { top: 8px; right: 8px; }
   .watch-shell { padding: 10px; }
   .watch-brand h1 { font-size: 20px; }
   .watch-live { padding: 5px 7px; font-size: 9px; }

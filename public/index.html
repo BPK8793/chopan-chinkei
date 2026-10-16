@@ -19,6 +19,15 @@
       </div>
     </header>
 
+    <details class="sound-settings panel">
+      <summary>♪ 音設定</summary>
+      <div class="sound-settings-content">
+        <label><input id="soundEffectsEnabled" type="checkbox"> 効果音</label>
+        <label><input id="turnSpeechEnabled" type="checkbox"> ターン読み上げ</label>
+        <label class="sound-volume" for="soundVolume">音量 <input id="soundVolume" type="range" min="0" max="100" step="5"><output id="soundVolumeValue" for="soundVolume">55%</output></label>
+      </div>
+    </details>
+
     <div id="connectionBanner" class="connection-banner hidden" role="status">サーバーに再接続しています…</div>
     <div id="toast" class="toast hidden" role="alert"></div>
 
@@ -147,6 +156,7 @@
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="/card-view.js"></script>
+  <script src="/sound-manager.js"></script>
   <script src="/client.js"></script>
 </body>
 </html>

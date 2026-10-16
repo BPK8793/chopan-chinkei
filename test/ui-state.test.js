@@ -31,6 +31,7 @@ class FakeElement {
     this.value = "";
     this.textContent = "";
     this.disabled = false;
+    this.checked = false;
     this.dataset = {};
     this.style = {
       values: new Map(),
@@ -44,6 +45,51 @@ class FakeElement {
   click() { this.listeners.get("click")?.({ target: this }); }
   remove() { this.removed = true; }
   setAttribute() {}
+}
+
+function runSoundManager(mode = "player") {
+  const storage = new Map();
+  const documentListeners = new Map();
+  const played = [];
+  const spoken = [];
+  const elements = new Map();
+  class FakeAudio {
+    constructor(src) { this.src = src; }
+    addEventListener() {}
+    play() { played.push(this.src); return Promise.resolve(); }
+  }
+  class FakeUtterance {
+    constructor(text) { this.text = text; }
+  }
+  const speechSynthesis = {
+    getVoices: () => [{ lang: "ja-JP", name: "Japanese" }],
+    cancel: () => {},
+    speak: (utterance) => spoken.push(utterance)
+  };
+  const document = {
+    addEventListener: (event, handler) => documentListeners.set(event, handler),
+    getElementById: (id) => {
+      if (!elements.has(id)) elements.set(id, new FakeElement(id));
+      return elements.get(id);
+    }
+  };
+  const context = {
+    Audio: FakeAudio,
+    SpeechSynthesisUtterance: FakeUtterance,
+    document,
+    localStorage: {
+      getItem: (key) => storage.get(key) || null,
+      setItem: (key, value) => storage.set(key, value)
+    },
+    window: { speechSynthesis }
+  };
+  vm.runInNewContext(
+    fs.readFileSync(path.join(__dirname, "..", "public", "sound-manager.js"), "utf8"),
+    context,
+    { filename: "sound-manager.js" }
+  );
+  const controller = context.window.ChopanAudio.createSoundController({ mode });
+  return { controller, documentListeners, elements, played, spoken, storage };
 }
 
 class FakeSocket {
@@ -215,6 +261,80 @@ test("OBS screen keeps the game start overlay hidden", () => {
 
   assert.equal(elements.get("watchProgress").classList.contains("hidden"), false);
   assert.equal(elements.get("watchEffect").classList.contains("hidden"), true);
+});
+
+test("sound events use the replaceable mp3 paths only after user interaction", () => {
+  const { controller, documentListeners, played } = runSoundManager();
+  controller.play("cardFlipped");
+  assert.deepEqual(played, []);
+
+  documentListeners.get("pointerdown")();
+  controller.play("cardFlipped");
+  controller.play("pairMatched");
+  controller.play("pairFailed");
+  controller.play("jokerActivated");
+  controller.play("gameEnded");
+  assert.deepEqual(played, [
+    "/sounds/flip.mp3",
+    "/sounds/match.mp3",
+    "/sounds/miss.mp3",
+    "/sounds/joker.mp3",
+    "/sounds/finish.mp3"
+  ]);
+});
+
+test("turn speech runs once when an opponent hands the turn to this player", () => {
+  const { controller, documentListeners, spoken } = runSoundManager();
+  documentListeners.get("pointerdown")();
+  const opponentTurn = baseState({ status: "playing", currentPlayerId: "guest" });
+  const myTurn = baseState({ status: "playing", currentPlayerId: "host" });
+
+  controller.handleGameEvent("turnChanged", myTurn, opponentTurn, { selfId: "host" });
+  controller.handleGameEvent("roomUpdated", myTurn, myTurn, { selfId: "host" });
+  controller.handleGameEvent("pairMatched", myTurn, myTurn, { selfId: "host" });
+  assert.equal(spoken.length, 1);
+  assert.equal(spoken[0].text, "ホストさんの番だよ");
+  assert.equal(spoken[0].lang, "ja-JP");
+  assert.equal(spoken[0].voice.lang, "ja-JP");
+});
+
+test("sound controls persist mute, speech, and volume per screen mode", () => {
+  const { controller, documentListeners, elements, played, storage } = runSoundManager("watch");
+  assert.equal(controller.settings.effects, true);
+  assert.equal(controller.settings.speech, false);
+
+  const effects = elements.get("soundEffectsEnabled");
+  const speech = elements.get("turnSpeechEnabled");
+  const volume = elements.get("soundVolume");
+  effects.checked = false;
+  effects.listeners.get("change")();
+  speech.checked = true;
+  speech.listeners.get("change")();
+  volume.value = "35";
+  volume.listeners.get("input")();
+  documentListeners.get("pointerdown")();
+  controller.play("cardFlipped");
+
+  assert.deepEqual(JSON.parse(storage.get("chopan-sound-settings-watch")), {
+    effects: false,
+    speech: true,
+    volume: 0.35
+  });
+  assert.deepEqual(played, [], "muted effects do not play");
+});
+
+test("all requested mp3 assets and audio controls are present", () => {
+  for (const filename of ["flip.mp3", "match.mp3", "miss.mp3", "joker.mp3", "finish.mp3"]) {
+    assert.ok(fs.statSync(path.join(__dirname, "..", "public", "sounds", filename)).size > 1000);
+  }
+  const playerHtml = fs.readFileSync(path.join(__dirname, "..", "public", "index.html"), "utf8");
+  const watchHtml = fs.readFileSync(path.join(__dirname, "..", "public", "watch.html"), "utf8");
+  assert.match(playerHtml, /id="soundEffectsEnabled"/);
+  assert.match(playerHtml, /id="turnSpeechEnabled"/);
+  assert.match(playerHtml, /id="soundVolume"/);
+  assert.match(watchHtml, /id="watchSoundEffectsEnabled"/);
+  assert.match(watchHtml, /id="watchTurnSpeechEnabled"/);
+  assert.match(watchHtml, /id="watchSoundVolume"/);
 });
 
 test("player, watcher, and OBS countdowns use the shared server reveal deadline", () => {

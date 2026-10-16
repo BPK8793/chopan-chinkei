@@ -7,6 +7,7 @@ let revealInterval = null;
 
 const $ = (id) => document.getElementById(id);
 const screens = [$("homeScreen"), $("roomScreen"), $("gameScreen")];
+const soundController = window.ChopanAudio?.createSoundController({ mode: "player" });
 const RESUME_ROOM_KEY = "chopan-resume-room";
 const RESUME_TOKEN_KEY = "chopan-resume-token";
 
@@ -164,8 +165,10 @@ function renderResults() {
   $("lobbyButton").classList.toggle("hidden", !isHost());
 }
 
-function applyState(next) {
+function applyState(next, eventName = "roomUpdated") {
+  const previousState = state;
   saveResumeCredentials(next);
+  soundController?.handleGameEvent(eventName, next, previousState, { selfId: socket.id });
   state = next;
   if (state.status !== "waiting") {
     $("startButton").classList.add("hidden");
@@ -193,7 +196,7 @@ socket.on("connect_error", () => $("connectionBanner").classList.remove("hidden"
 [
   "roomCreated", "roomJoined", "roomResumed", "roomUpdated", "gameStarted", "cardFlipped", "pairMatched",
   "pairFailed", "turnChanged", "jokerActivated", "gameEnded"
-].forEach((event) => socket.on(event, applyState));
+].forEach((event) => socket.on(event, (next) => applyState(next, event)));
 socket.on("errorMessage", ({ message }) => {
   showToast(message);
   // 開始要求が拒否された場合は、最新の待機状態に合う表示へ戻す。

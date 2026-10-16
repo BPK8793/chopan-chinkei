@@ -3,6 +3,15 @@
 const watchSocket = io();
 const watchRoomId = decodeURIComponent(location.pathname.split("/").filter(Boolean)[1] || "");
 const isObsMode = new URLSearchParams(location.search).get("obs") === "1";
+const watchSoundController = window.ChopanAudio?.createSoundController({
+  mode: isObsMode ? "obs" : "watch",
+  ids: {
+    effects: "watchSoundEffectsEnabled",
+    speech: "watchTurnSpeechEnabled",
+    volume: "watchSoundVolume",
+    volumeOutput: "watchSoundVolumeValue"
+  }
+});
 let watchState = null;
 let watchRevealInterval = null;
 
@@ -73,7 +82,9 @@ function renderWatchResults() {
   }));
 }
 
-function renderWatch(nextState) {
+function renderWatch(nextState, eventName = "roomUpdated") {
+  const previousState = watchState;
+  watchSoundController?.handleGameEvent(eventName, nextState, previousState);
   watchState = nextState;
   watchElement("watchRoomCode").textContent = watchState.roomId;
   watchElement("watchRemainingPairs").textContent = watchState.remainingPairs;
@@ -135,4 +146,4 @@ watchSocket.on("watchUnavailable", ({ message }) => {
 [
   "watchJoined", "roomUpdated", "gameStarted", "cardFlipped", "pairMatched",
   "pairFailed", "turnChanged", "jokerActivated", "gameEnded"
-].forEach((event) => watchSocket.on(event, renderWatch));
+].forEach((event) => watchSocket.on(event, (nextState) => renderWatch(nextState, event)));

@@ -11,6 +11,14 @@
 </head>
 <body class="watch-body">
   <main class="watch-shell">
+    <details class="sound-settings watch-sound-settings panel">
+      <summary>♪ 音設定</summary>
+      <div class="sound-settings-content">
+        <label><input id="watchSoundEffectsEnabled" type="checkbox"> 効果音</label>
+        <label><input id="watchTurnSpeechEnabled" type="checkbox"> ターン読み上げ</label>
+        <label class="sound-volume" for="watchSoundVolume">音量 <input id="watchSoundVolume" type="range" min="0" max="100" step="5"><output id="watchSoundVolumeValue" for="watchSoundVolume">55%</output></label>
+      </div>
+    </details>
     <nav class="watch-controls" aria-label="観戦画面の操作">
       <a class="text-button watch-back" href="/">← トップへ戻る</a>
       <p>観戦専用画面です。カードやゲームの操作はできません。</p>
@@ -50,6 +58,7 @@
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="/card-view.js"></script>
+  <script src="/sound-manager.js"></script>
   <script src="/watch.js"></script>
 </body>
 </html>
