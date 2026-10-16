@@ -12,6 +12,10 @@ const CARD_DISPLAY_TIMINGS = Object.freeze({
   mismatchMs: 2200,
   jokerRevealMs: 6000
 });
+const ORDER_GAME_TIMINGS = Object.freeze({
+  choiceMs: 10_000,
+  revealMs: 3500
+});
 const ROOM_DISCONNECT_GRACE_MS = 60_000;
 const CARD_LAYOUT = Object.freeze({
   X_OFFSET_MAX: 30,
@@ -151,6 +155,9 @@ function createApplication(options = {}) {
   const random = options.random || Math.random;
   const failDelay = options.failDelay ?? CARD_DISPLAY_TIMINGS.mismatchMs;
   const jokerDelay = options.jokerDelay ?? CARD_DISPLAY_TIMINGS.jokerRevealMs;
+  const orderChoiceMs = options.orderChoiceMs ?? ORDER_GAME_TIMINGS.choiceMs;
+  const orderRevealMs = options.orderRevealMs ?? ORDER_GAME_TIMINGS.revealMs;
+  const skipOrderGame = options.skipOrderGame === true;
   const disconnectGraceMs = options.disconnectGraceMs ?? ROOM_DISCONNECT_GRACE_MS;
   const pendingDisconnects = new Map();
 
@@ -205,7 +212,7 @@ function createApplication(options = {}) {
       players: room.players.map(({ id, name, score, connected, rematch }) => ({
         id, name, score, connected, rematch
       })),
-      currentPlayerId: currentPlayer(room)?.id || null,
+      currentPlayerId: room.status === "playing" ? currentPlayer(room)?.id || null : null,
       cards,
       selectedCards: [...room.selectedCards],
       isProcessing: room.isProcessing,
@@ -215,7 +222,18 @@ function createApplication(options = {}) {
         ? room.cards.filter((card) => !card.matched).length / 2
         : 17,
       message: room.message,
-      winners: room.winners
+      winners: room.winners,
+      orderEndsAt: room.orderEndsAt,
+      turnOrder: [...room.turnOrder],
+      orderCards: room.orderCards.map((card) => ({
+        id: card.id,
+        chosenBy: card.chosenBy,
+        ...(room.orderRevealed ? {
+          value: card.value,
+          label: card.joker ? "JOKER" : String(card.value),
+          joker: card.joker
+        } : {})
+      }))
     };
   }
 
@@ -290,7 +308,7 @@ function createApplication(options = {}) {
       );
       if (playerIndex === -1 || currentRoom.players[playerIndex].connected) return;
 
-      if (currentRoom.status === "playing") {
+      if (["orderSelection", "orderResult", "playing"].includes(currentRoom.status)) {
         closeEmptyRoom(currentRoom);
         return;
       }
@@ -308,8 +326,27 @@ function createApplication(options = {}) {
     pendingDisconnects.set(player.resumeToken, timer);
   }
 
-  function startRound(room) {
-    room.roundId += 1;
+  function resetRoundState(room) {
+    room.cards = [];
+    room.selectedCards = [];
+    room.currentPlayerIndex = 0;
+    room.isProcessing = false;
+    room.revealAll = false;
+    room.revealEndsAt = null;
+    room.message = "";
+    room.winners = [];
+    room.orderCards = [];
+    room.orderEndsAt = null;
+    room.orderRevealed = false;
+    room.turnOrder = [];
+    room.players.forEach((player) => {
+      player.score = 0;
+      player.rematch = false;
+    });
+  }
+
+  function startRound(room, roundId = room.roundId) {
+    if (!rooms.has(room.id) || room.roundId !== roundId) return;
     room.status = "playing";
     room.cards = applyCardLayout(createDeck(random), random);
     room.selectedCards = [];
@@ -320,28 +357,62 @@ function createApplication(options = {}) {
     room.revealEndsAt = null;
     room.message = "";
     room.winners = [];
-    room.players.forEach((player) => {
-      player.score = 0;
-      player.rematch = false;
-    });
+    room.orderEndsAt = null;
     broadcast(room, "gameStarted");
+  }
+
+  function finishOrderSelection(room, roundId = room.roundId) {
+    if (!rooms.has(room.id) || room.roundId !== roundId || room.status !== "orderSelection") return;
+    const connected = activePlayers(room);
+    const available = room.orderCards.filter((card) => !card.chosenBy);
+    for (const player of connected.filter((candidate) =>
+      !room.orderCards.some((card) => card.chosenBy === candidate.id)
+    )) {
+      const card = available.shift();
+      if (card) card.chosenBy = player.id;
+    }
+
+    const chosenValue = new Map(room.orderCards.map((card) => [card.chosenBy, card.value]));
+    const orderedConnected = [...connected].sort((a, b) => chosenValue.get(b.id) - chosenValue.get(a.id));
+    const disconnected = room.players.filter((player) => !player.connected);
+    room.players = [...orderedConnected, ...disconnected];
+    room.currentPlayerIndex = 0;
+    room.turnOrder = orderedConnected.map((player) => player.id);
+    room.orderRevealed = true;
+    room.orderEndsAt = null;
+    room.status = "orderResult";
+    broadcast(room, "orderRevealed");
+    const timer = setTimeout(() => startRound(room, roundId), orderRevealMs);
+    timer.unref?.();
+  }
+
+  function startOrderSelection(room) {
+    room.roundId += 1;
+    resetRoundState(room);
+    if (skipOrderGame) return startRound(room);
+
+    const connected = activePlayers(room);
+    const values = Array.from({ length: connected.length }, (_value, index) => ({
+      value: index + 1,
+      joker: index === connected.length - 1
+    }));
+    room.orderCards = shuffle(values, random).map((card, index) => ({
+      id: `order-${room.roundId}-${index}`,
+      ...card,
+      chosenBy: null
+    }));
+    room.status = "orderSelection";
+    room.orderEndsAt = Date.now() + orderChoiceMs;
+    broadcast(room, "orderSelectionStarted");
+    const roundId = room.roundId;
+    const timer = setTimeout(() => finishOrderSelection(room, roundId), orderChoiceMs);
+    timer.unref?.();
   }
 
   function returnToLobby(room) {
     room.roundId += 1;
     room.status = "waiting";
-    room.cards = [];
-    room.selectedCards = [];
-    room.currentPlayerIndex = 0;
-    room.isProcessing = false;
-    room.revealAll = false;
-    room.revealEndsAt = null;
-    room.message = "";
-    room.winners = [];
-    room.players.forEach((player) => {
-      player.score = 0;
-      player.rematch = false;
-    });
+    resetRoundState(room);
     broadcast(room);
   }
 
@@ -364,6 +435,10 @@ function createApplication(options = {}) {
         room.message = "";
       }
       room.players.splice(playerIndex, 1);
+      if (room.status === "orderSelection") {
+        const selected = room.orderCards.find((card) => card.chosenBy === player.id);
+        if (selected) selected.chosenBy = null;
+      }
       if (playerIndex < room.currentPlayerIndex) room.currentPlayerIndex -= 1;
       if (room.currentPlayerIndex >= room.players.length) room.currentPlayerIndex = 0;
       if (room.status === "playing" && room.players.length > 0) ensureCurrentConnected(room);
@@ -387,6 +462,12 @@ function createApplication(options = {}) {
     }
     if (room.hostSocketId === player.id && (explicit || room.status === "playing")) {
       room.hostSocketId = activePlayers(room)[0].id;
+    }
+    if (room.status === "orderSelection" && activePlayers(room).every((candidate) =>
+      room.orderCards.some((card) => card.chosenBy === candidate.id)
+    )) {
+      finishOrderSelection(room);
+      return;
     }
     broadcast(room);
   }
@@ -437,6 +518,10 @@ function createApplication(options = {}) {
         revealEndsAt: null,
         message: "",
         winners: [],
+        orderCards: [],
+        orderEndsAt: null,
+        orderRevealed: false,
+        turnOrder: [],
         roundId: 0
       };
       rooms.set(id, room);
@@ -487,6 +572,10 @@ function createApplication(options = {}) {
       if (room.hostSocketId === previousSocketId) room.hostSocketId = socket.id;
       player.id = socket.id;
       player.connected = true;
+      room.orderCards.forEach((card) => {
+        if (card.chosenBy === previousSocketId) card.chosenBy = socket.id;
+      });
+      room.turnOrder = room.turnOrder.map((id) => id === previousSocketId ? socket.id : id);
       socket.join(room.id);
       ensureCurrentConnected(room);
       socket.emit("roomResumed", { ...publicState(room), resumeToken: player.resumeToken });
@@ -500,7 +589,22 @@ function createApplication(options = {}) {
       if (room.hostSocketId !== socket.id) return emitError(socket, "開始できるのはルーム作成者だけです");
       if (room.status !== "waiting") return emitError(socket, "ゲームはすでに開始されています");
       if (activePlayers(room).length < MIN_PLAYERS) return emitError(socket, "2人以上で開始できます");
-      startRound(room);
+      startOrderSelection(room);
+    });
+
+    socket.on("chooseOrderCard", (payload = {}) => {
+      const membership = findMembership(socket);
+      if (!membership) return emitError(socket, "ルームに参加していません");
+      const { room, playerIndex } = membership;
+      if (room.status !== "orderSelection" || !room.players[playerIndex].connected) return;
+      if (room.orderCards.some((card) => card.chosenBy === socket.id)) return;
+      const card = room.orderCards.find((candidate) => candidate.id === String(payload.cardId || ""));
+      if (!card || card.chosenBy) return emitError(socket, "そのカードはすでに選ばれています");
+      card.chosenBy = socket.id;
+      broadcast(room, "orderCardChosen");
+      if (activePlayers(room).every((player) =>
+        room.orderCards.some((candidate) => candidate.chosenBy === player.id)
+      )) finishOrderSelection(room);
     });
 
     socket.on("flipCard", (payload = {}) => {
@@ -575,7 +679,7 @@ function createApplication(options = {}) {
       if (room.status !== "finished") return;
       room.players[playerIndex].rematch = true;
       const connected = activePlayers(room);
-      if (connected.length >= MIN_PLAYERS && connected.every((player) => player.rematch)) startRound(room);
+      if (connected.length >= MIN_PLAYERS && connected.every((player) => player.rematch)) startOrderSelection(room);
       else broadcast(room);
     });
 
@@ -613,6 +717,7 @@ if (require.main === module) {
 module.exports = {
   CARD_DISPLAY_TIMINGS,
   CARD_LAYOUT,
+  ORDER_GAME_TIMINGS,
   applyCardLayout,
   createApplication,
   createCardLayout,

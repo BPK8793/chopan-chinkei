@@ -4,6 +4,7 @@ const socket = io();
 let state = null;
 let toastTimer = null;
 let revealInterval = null;
+let orderInterval = null;
 
 const $ = (id) => document.getElementById(id);
 const screens = [$("homeScreen"), $("roomScreen"), $("gameScreen")];
@@ -44,6 +45,20 @@ function isHost() {
   return state?.hostId === socket.id;
 }
 
+function renderPlayersBar() {
+  $("playersBar").replaceChildren(...state.players.map((player) => {
+    const chip = document.createElement("div");
+    chip.className = `score-chip${player.id === state.currentPlayerId ? " current" : ""}${!player.connected ? " disconnected" : ""}`;
+    const prefix = player.id === state.currentPlayerId ? "▶ " : "";
+    chip.append(document.createTextNode(`${prefix}${player.name} `));
+    const score = document.createElement("b");
+    score.textContent = `${player.score}点`;
+    chip.append(score);
+    if (!player.connected) chip.title = "退出済み";
+    return chip;
+  }));
+}
+
 function renderLobby() {
   showScreen($("roomScreen"));
   $("roomCode").textContent = state.roomId;
@@ -76,6 +91,8 @@ function renderLobby() {
 
 function renderGame() {
   showScreen($("gameScreen"));
+  $("orderGame").classList.add("hidden");
+  $("cardGrid").classList.remove("hidden");
   $("gameProgress").classList.toggle("hidden", state.status !== "playing");
   $("gameRoomCode").textContent = state.roomId;
   $("remainingPairs").textContent = state.remainingPairs;
@@ -91,17 +108,7 @@ function renderGame() {
     $("turnInstruction").textContent = current ? `${current.name}さんが2枚選んでいます` : "次のターンを待っています";
   }
 
-  $("playersBar").replaceChildren(...state.players.map((player) => {
-    const chip = document.createElement("div");
-    chip.className = `score-chip${player.id === state.currentPlayerId ? " current" : ""}${!player.connected ? " disconnected" : ""}`;
-    const prefix = player.id === state.currentPlayerId ? "▶ " : "";
-    chip.append(document.createTextNode(`${prefix}${player.name} `));
-    const score = document.createElement("b");
-    score.textContent = `${player.score}点`;
-    chip.append(score);
-    if (!player.connected) chip.title = "退出済み";
-    return chip;
-  }));
+  renderPlayersBar();
 
   const canFlip = state.currentPlayerId === socket.id && !state.isProcessing && !state.revealAll;
   const existing = Array.from($("cardGrid").children);
@@ -125,6 +132,75 @@ function renderGame() {
   }
   $("jokerChanceBurst").classList.toggle("hidden", !state.revealAll);
   renderRevealTimer();
+}
+
+function renderOrderGame() {
+  showScreen($("gameScreen"));
+  clearInterval(orderInterval);
+  $("gameRoomCode").textContent = state.roomId;
+  $("turnName").textContent = "順番決め";
+  $("remainingPairs").textContent = "17";
+  $("gameProgress").classList.add("hidden");
+  $("cardGrid").classList.add("hidden");
+  $("effectMessage").classList.add("hidden");
+  $("jokerChanceBurst").classList.add("hidden");
+  $("revealTimer").classList.add("hidden");
+  $("orderGame").classList.remove("hidden");
+  renderPlayersBar();
+
+  const selectedByMe = state.orderCards.some((card) => card.chosenBy === socket.id);
+  $("orderGameTitle").textContent = state.status === "orderResult" ? "順番決定！" : "運命の1枚を選ぼう！";
+  $("orderGameGuide").textContent = state.status === "orderResult"
+    ? "この順番でゲームを開始します"
+    : selectedByMe ? "みんなが選び終わるのを待っています…" : "数字が大きい人からスタート。JOKERは最優先！";
+
+  $("orderCardGrid").replaceChildren(...state.orderCards.map((card) => {
+    const button = document.createElement("button");
+    const owner = state.players.find((player) => player.id === card.chosenBy);
+    button.type = "button";
+    button.className = `order-card${card.chosenBy ? " chosen" : ""}${card.joker ? " joker" : ""}`;
+    button.disabled = state.status !== "orderSelection" || selectedByMe || Boolean(card.chosenBy);
+    if (state.status === "orderResult") {
+      const value = document.createElement("strong");
+      value.textContent = card.label;
+      const name = document.createElement("span");
+      name.textContent = owner?.name || "自動選択";
+      button.append(value, name);
+    } else {
+      const mark = document.createElement("strong");
+      mark.textContent = card.chosenBy ? "✓" : "?";
+      const name = document.createElement("span");
+      name.textContent = owner ? `${owner.name}が選択` : "このカードを選ぶ";
+      button.append(mark, name);
+      button.addEventListener("click", () => socket.emit("chooseOrderCard", { cardId: card.id }));
+    }
+    return button;
+  }));
+
+  const resultPlayers = state.turnOrder.map((id) => state.players.find((player) => player.id === id)).filter(Boolean);
+  $("orderResultList").replaceChildren(...resultPlayers.map((player, index) => {
+    const row = document.createElement("div");
+    row.className = "order-result-row";
+    const rank = document.createElement("strong");
+    rank.textContent = `${index + 1}`;
+    const name = document.createElement("span");
+    name.textContent = player.name;
+    row.append(rank, name);
+    return row;
+  }));
+  $("orderResultList").classList.toggle("hidden", state.status !== "orderResult");
+
+  const updateTimer = () => {
+    if (state.status !== "orderSelection") {
+      $("orderGameTimer").textContent = "まもなくゲームスタート！";
+      return;
+    }
+    const seconds = Math.max(0, Math.ceil((Number(state.orderEndsAt) - Date.now()) / 1000));
+    const chosen = state.orderCards.filter((card) => card.chosenBy).length;
+    $("orderGameTimer").textContent = `選択済み ${chosen}/${state.players.filter((player) => player.connected).length}人　残り${seconds}秒`;
+  };
+  updateTimer();
+  if (state.status === "orderSelection") orderInterval = setInterval(updateTimer, 250);
 }
 
 function renderRevealTimer() {
@@ -181,6 +257,9 @@ function applyState(next, eventName = "roomUpdated") {
   if (state.status === "waiting") {
     $("resultModal").classList.add("hidden");
     renderLobby();
+  } else if (state.status === "orderSelection" || state.status === "orderResult") {
+    $("resultModal").classList.add("hidden");
+    renderOrderGame();
   } else if (state.status === "playing") {
     $("resultModal").classList.add("hidden");
     renderGame();
@@ -198,7 +277,7 @@ socket.on("connect", () => {
 socket.on("disconnect", () => $("connectionBanner").classList.remove("hidden"));
 socket.on("connect_error", () => $("connectionBanner").classList.remove("hidden"));
 [
-  "roomCreated", "roomJoined", "roomResumed", "roomUpdated", "gameStarted", "cardFlipped", "pairMatched",
+  "roomCreated", "roomJoined", "roomResumed", "roomUpdated", "orderSelectionStarted", "orderCardChosen", "orderRevealed", "gameStarted", "cardFlipped", "pairMatched",
   "pairFailed", "turnChanged", "jokerActivated", "gameEnded"
 ].forEach((event) => socket.on(event, (next) => applyState(next, event)));
 socket.on("errorMessage", ({ message }) => {

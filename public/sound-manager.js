@@ -132,13 +132,14 @@
       } catch { /* カウント音が使えなくてもゲームは続行 */ }
     }
 
-    function speak(text, { rate = 1.3125, pitch = 1.08 } = {}) {
-      if (!settings.speech || !unlocked || !text || !("speechSynthesis" in window)) return;
+    function speak(text, { rate = 1.3125, pitch = 1.08, setting = "speech" } = {}) {
+      if (!settings[setting] || !unlocked || !text || !("speechSynthesis" in window)) return;
       try {
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = "ja-JP";
         utterance.rate = rate;
         utterance.pitch = pitch;
+        utterance.volume = settings.volume;
         const japaneseVoice = window.speechSynthesis.getVoices().find((voice) => voice.lang?.toLowerCase().startsWith("ja"));
         if (japaneseVoice) utterance.voice = japaneseVoice;
         window.speechSynthesis.cancel();
@@ -150,7 +151,7 @@
       play(eventName);
       const jokerJustActivated = eventName === "jokerActivated" && nextState?.revealAll && !previousState?.revealAll;
       if (jokerJustActivated) {
-        speak("はげちょぱ！ チャーーーーンス！", { rate: 0.92, pitch: 1.45 });
+        speak("はげちょぱ！ チャーーーーンス！", { rate: 0.92, pitch: 1.45, setting: "effects" });
       }
       if (!nextState || nextState.status !== "playing") return;
       const current = nextState.players?.find((player) => player.id === nextState.currentPlayerId);

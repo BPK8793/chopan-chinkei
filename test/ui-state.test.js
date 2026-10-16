@@ -169,6 +169,9 @@ function baseState(overrides = {}) {
     remainingPairs: 17,
     message: "",
     winners: [],
+    orderEndsAt: null,
+    turnOrder: [],
+    orderCards: [],
     ...overrides
   };
 }
@@ -233,6 +236,40 @@ test("start button stays hidden for a non-host and hides immediately after host 
   assert.equal(hostUi.elements.get("startButton").classList.contains("hidden"), false);
 });
 
+test("the order mini-game lets each player choose once and displays the revealed order", () => {
+  const { socket, elements } = runBrowserScript("client.js", "host");
+  const choosing = baseState({
+    status: "orderSelection",
+    currentPlayerId: null,
+    orderEndsAt: Date.now() + 10_000,
+    orderCards: [
+      { id: "order-1", chosenBy: null },
+      { id: "order-2", chosenBy: null }
+    ]
+  });
+  socket.receive("orderSelectionStarted", choosing);
+
+  assert.equal(elements.get("orderGame").classList.contains("hidden"), false);
+  assert.equal(elements.get("cardGrid").classList.contains("hidden"), true);
+  assert.equal(elements.get("orderCardGrid").children.length, 2);
+  elements.get("orderCardGrid").children[0].click();
+  assert.equal(socket.emitted.at(-1)[0], "chooseOrderCard");
+  assert.equal(socket.emitted.at(-1)[1].cardId, "order-1");
+
+  socket.receive("orderRevealed", baseState({
+    status: "orderResult",
+    currentPlayerId: "host",
+    turnOrder: ["host", "guest"],
+    orderCards: [
+      { id: "order-1", chosenBy: "host", value: 2, label: "JOKER", joker: true },
+      { id: "order-2", chosenBy: "guest", value: 1, label: "1", joker: false }
+    ]
+  }));
+  assert.equal(elements.get("orderGameTitle").textContent, "順番決定！");
+  assert.equal(elements.get("orderResultList").children.length, 2);
+  assert.equal(elements.get("orderResultList").children[0].children[1].textContent, "ホスト");
+});
+
 test("a player can confirm leaving from the active game screen", () => {
   const html = fs.readFileSync(path.join(__dirname, "..", "public", "index.html"), "utf8");
   assert.match(html, /id="quitGameButton"/);
@@ -272,6 +309,39 @@ test("watch screen has no start control and switches to read-only progress displ
   assert.equal(elements.get("watchCurrentTurnStatus").textContent, "現在のターン：ホスト");
   assert.equal(elements.get("watchTurnInstruction").textContent, "ホストさんが2枚選んでいます");
   assert.equal(elements.get("watchEffect").classList.contains("hidden"), true);
+});
+
+test("watchers can follow the order mini-game without being able to choose", () => {
+  const { socket, elements } = runBrowserScript(
+    "watch.js",
+    "watcher",
+    { pathname: "/watch/1234", search: "" }
+  );
+  socket.receive("orderSelectionStarted", baseState({
+    status: "orderSelection",
+    currentPlayerId: null,
+    orderEndsAt: Date.now() + 10_000,
+    orderCards: [
+      { id: "order-1", chosenBy: "host" },
+      { id: "order-2", chosenBy: null }
+    ]
+  }));
+
+  assert.equal(elements.get("watchOrderGame").classList.contains("hidden"), false);
+  assert.equal(elements.get("watchOrderCards").children.length, 2);
+  assert.equal(socket.emitted.some(([event]) => event === "chooseOrderCard"), false);
+
+  socket.receive("orderRevealed", baseState({
+    status: "orderResult",
+    currentPlayerId: null,
+    turnOrder: ["host", "guest"],
+    orderCards: [
+      { id: "order-1", chosenBy: "host", value: 2, label: "JOKER", joker: true },
+      { id: "order-2", chosenBy: "guest", value: 1, label: "1", joker: false }
+    ]
+  }));
+  assert.equal(elements.get("watchOrderTitle").textContent, "順番決定！");
+  assert.equal(elements.get("watchOrderResult").children.length, 2);
 });
 
 test("OBS screen keeps the game start overlay hidden", () => {
@@ -338,17 +408,29 @@ test("joker chance uses one slower and higher special announcement", () => {
   assert.equal(spoken[0].lang, "ja-JP");
   assert.equal(spoken[0].rate, 0.92);
   assert.equal(spoken[0].pitch, 1.45);
+  assert.equal(spoken[0].volume, 0.55);
 });
 
-test("joker announcement stays silent when spectator speech is off", () => {
-  const { controller, documentListeners, spoken } = runSoundManager("watch");
+test("joker announcement follows effects even when turn speech is off", () => {
+  const { controller, documentListeners, elements, spoken } = runSoundManager("watch");
   documentListeners.get("pointerdown")();
   controller.handleGameEvent(
     "jokerActivated",
     baseState({ status: "playing", revealAll: true }),
     baseState({ status: "playing", revealAll: false })
   );
-  assert.deepEqual(spoken, []);
+  assert.equal(controller.settings.speech, false);
+  assert.equal(spoken.length, 1);
+
+  const effects = elements.get("soundEffectsEnabled");
+  effects.checked = false;
+  effects.listeners.get("change")();
+  controller.handleGameEvent(
+    "jokerActivated",
+    baseState({ status: "playing", revealAll: true }),
+    baseState({ status: "playing", revealAll: false })
+  );
+  assert.equal(spoken.length, 1);
 });
 
 test("joker countdown ticks once per displayed second and respects mute", () => {

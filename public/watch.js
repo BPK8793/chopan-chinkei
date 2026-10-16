@@ -85,6 +85,42 @@ function renderWatchResults() {
   }));
 }
 
+function renderWatchOrderGame() {
+  const active = watchState.status === "orderSelection" || watchState.status === "orderResult";
+  watchElement("watchOrderGame").classList.toggle("hidden", !active);
+  watchElement("watchCardGrid").classList.toggle("hidden", active);
+  if (!active) return;
+
+  const revealed = watchState.status === "orderResult";
+  watchElement("watchOrderTitle").textContent = revealed ? "順番決定！" : "運命の1枚を選択中！";
+  watchElement("watchOrderGuide").textContent = revealed
+    ? "この順番でゲームを開始します"
+    : `選択済み ${watchState.orderCards.filter((card) => card.chosenBy).length}/${watchState.players.filter((player) => player.connected).length}人`;
+  watchElement("watchOrderCards").replaceChildren(...watchState.orderCards.map((card) => {
+    const item = document.createElement("div");
+    const owner = watchState.players.find((player) => player.id === card.chosenBy);
+    item.className = `order-card${card.chosenBy ? " chosen" : ""}${card.joker ? " joker" : ""}`;
+    const value = document.createElement("strong");
+    value.textContent = revealed ? card.label : card.chosenBy ? "✓" : "?";
+    const name = document.createElement("span");
+    name.textContent = owner ? owner.name : "未選択";
+    item.append(value, name);
+    return item;
+  }));
+  const ordered = watchState.turnOrder.map((id) => watchState.players.find((player) => player.id === id)).filter(Boolean);
+  watchElement("watchOrderResult").replaceChildren(...ordered.map((player, index) => {
+    const row = document.createElement("div");
+    row.className = "order-result-row";
+    const rank = document.createElement("strong");
+    rank.textContent = String(index + 1);
+    const name = document.createElement("span");
+    name.textContent = player.name;
+    row.append(rank, name);
+    return row;
+  }));
+  watchElement("watchOrderResult").classList.toggle("hidden", !revealed);
+}
+
 function renderWatch(nextState, eventName = "roomUpdated") {
   const previousState = watchState;
   watchSoundController?.handleGameEvent(eventName, nextState, previousState);
@@ -98,6 +134,7 @@ function renderWatch(nextState, eventName = "roomUpdated") {
     ? "カードを判定しています…"
     : current ? `${current.name}さんが2枚選んでいます` : "次のターンを待っています";
   renderWatchPlayers();
+  renderWatchOrderGame();
 
   const status = watchElement("watchStatus");
   if (watchState.status === "waiting") {
@@ -108,7 +145,7 @@ function renderWatch(nextState, eventName = "roomUpdated") {
   } else {
     status.classList.add("hidden");
     watchElement("watchProgress").classList.toggle("hidden", watchState.status !== "playing");
-    renderWatchCards();
+    if (watchState.status === "playing" || watchState.status === "finished") renderWatchCards();
   }
 
   const effect = watchElement("watchEffect");
@@ -148,6 +185,6 @@ watchSocket.on("watchUnavailable", ({ message }) => {
   watchElement("watchCardGrid").replaceChildren();
 });
 [
-  "watchJoined", "roomUpdated", "gameStarted", "cardFlipped", "pairMatched",
+  "watchJoined", "roomUpdated", "orderSelectionStarted", "orderCardChosen", "orderRevealed", "gameStarted", "cardFlipped", "pairMatched",
   "pairFailed", "turnChanged", "jokerActivated", "gameEnded"
 ].forEach((event) => watchSocket.on(event, (nextState) => renderWatch(nextState, event)));

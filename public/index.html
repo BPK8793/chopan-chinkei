@@ -119,6 +119,14 @@
         </div>
         <button id="quitGameButton" class="game-quit-button" type="button">ゲームをやめる</button>
       </div>
+      <section id="orderGame" class="order-game panel hidden" aria-live="polite">
+        <p class="eyebrow">TURN ORDER</p>
+        <h2 id="orderGameTitle">運命の1枚を選ぼう！</h2>
+        <p id="orderGameGuide" class="muted">数字が大きい人からスタート。JOKERは最優先！</p>
+        <div id="orderCardGrid" class="order-card-grid" aria-label="順番決めカード"></div>
+        <p id="orderGameTimer" class="order-game-timer"></p>
+        <div id="orderResultList" class="order-result-list"></div>
+      </section>
       <div id="gameProgress" class="game-progress" role="status" aria-live="polite">
         <span class="game-progress-badge"><i aria-hidden="true"></i>ゲーム進行中</span>
         <strong id="currentTurnStatus">現在のターン：-</strong>

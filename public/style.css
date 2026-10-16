@@ -132,6 +132,21 @@ input:focus { border-color: var(--pink); box-shadow: 0 0 0 4px #fbe1e8; }
 .game-progress-badge i { width: 7px; height: 7px; border-radius: 50%; background: white; box-shadow: 0 0 0 3px rgba(255,255,255,.22); animation: livePulse 1.5s ease-in-out infinite; }
 .game-progress > strong { color: var(--pink-dark); }
 .game-progress > span:last-child { color: var(--muted); font-size: 13px; font-weight: 800; }
+.order-game { width: min(760px, calc(100% - 24px)); margin: 24px auto; padding: clamp(24px, 5vw, 42px); text-align: center; overflow: hidden; }
+.order-game h2 { margin: 4px 0 8px; color: var(--pink-dark); font-size: clamp(25px, 4vw, 38px); }
+.order-card-grid { width: min(600px, 100%); display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 132px)); justify-content: center; gap: clamp(12px, 3vw, 24px); margin: 28px auto 20px; }
+.order-card { position: relative; width: 100%; aspect-ratio: 3 / 4; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; border: 5px solid white; border-radius: 17px; color: white; background: repeating-conic-gradient(from 45deg, #cf5578 0 25%, #f28da7 0 50%) 50% / 24px 24px; box-shadow: 0 8px 0 #a83e60, 0 13px 25px rgba(105,45,66,.24); cursor: pointer; transition: transform .16s ease, filter .16s ease; }
+.order-card:not(:disabled):hover { transform: translateY(-7px) rotate(-2deg); filter: brightness(1.06); }
+.order-card:disabled { cursor: default; opacity: .72; }
+.order-card.chosen { transform: translateY(-6px); border-color: #ffe888; box-shadow: 0 8px 0 #b58b21, 0 0 0 5px rgba(255,232,136,.32); }
+.order-card strong { font-size: clamp(32px, 7vw, 58px); line-height: 1; text-shadow: 0 3px 0 rgba(90,35,55,.28); }
+.order-card span { max-width: 90%; font-size: 12px; font-weight: 900; }
+.order-card.joker { color: #fff3a5; background: radial-gradient(circle at 50% 35%, #9f63c8, #5b277f 72%); box-shadow: 0 8px 0 #421b5d, 0 13px 25px rgba(66,27,93,.3); }
+.order-card.joker strong { font-size: clamp(18px, 4vw, 30px); }
+.order-game-timer { min-height: 24px; color: var(--pink-dark); font-weight: 900; }
+.order-result-list { width: min(380px, 100%); margin: 18px auto 0; display: grid; gap: 8px; }
+.order-result-row { display: grid; grid-template-columns: 42px 1fr; align-items: center; padding: 9px 16px; border-radius: 13px; background: #fff4f7; text-align: left; font-weight: 900; }
+.order-result-row strong { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; color: white; background: var(--pink-dark); }
 @keyframes livePulse { 50% { opacity: .4; transform: scale(.8); } }
 .players-bar { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin: 14px 0; }
 .score-chip { display: flex; align-items: center; gap: 7px; max-width: 180px; padding: 7px 12px; border: 2px solid transparent; border-radius: 13px; background: white; color: var(--muted); font-size: 12px; font-weight: 800; }
@@ -387,6 +402,9 @@ input:focus { border-color: var(--pink); box-shadow: 0 0 0 4px #fbe1e8; }
 }
 
 @media (max-width: 560px) {
+  .order-game { margin-top: 12px; padding: 22px 12px; }
+  .order-card-grid { grid-template-columns: repeat(auto-fit, minmax(64px, 1fr)); gap: 8px; }
+  .order-card { border-width: 3px; }
   .app-shell { padding: 14px 10px 24px; }
   .brand { margin: 0 6px 14px; }
   .brand-mark { width: 43px; height: 43px; border-radius: 14px; }

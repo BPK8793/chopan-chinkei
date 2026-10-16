@@ -6,10 +6,15 @@ const { io: createClient } = require("socket.io-client");
 const {
   CARD_DISPLAY_TIMINGS,
   CARD_LAYOUT,
-  createApplication,
+  ORDER_GAME_TIMINGS,
+  createApplication: createServerApplication,
   createCardLayout,
   createDeck
 } = require("../server");
+
+function createApplication(options = {}) {
+  return createServerApplication({ skipOrderGame: true, ...options });
+}
 
 function once(socket, event) {
   return new Promise((resolve) => socket.once(event, resolve));
@@ -37,6 +42,78 @@ test("card display timings are centralized at the requested durations", () => {
   assert.equal(CARD_DISPLAY_TIMINGS.mismatchMs, 2200);
   assert.equal(CARD_DISPLAY_TIMINGS.jokerRevealMs, 6000);
   assert.equal(Object.isFrozen(CARD_DISPLAY_TIMINGS), true);
+});
+
+test("order game timings allow ten seconds to choose and a short result reveal", () => {
+  assert.equal(ORDER_GAME_TIMINGS.choiceMs, 10_000);
+  assert.equal(ORDER_GAME_TIMINGS.revealMs, 3500);
+  assert.equal(Object.isFrozen(ORDER_GAME_TIMINGS), true);
+});
+
+test("players privately choose cards and the revealed values determine turn order", async (t) => {
+  const game = createServerApplication({ random: () => 0.42, orderChoiceMs: 100, orderRevealMs: 10 });
+  const address = await game.start();
+  const url = `http://127.0.0.1:${address.port}`;
+  t.after(() => game.close());
+  const host = await connect(url);
+  const guest = await connect(url);
+  t.after(() => { host.close(); guest.close(); });
+
+  const createdPromise = once(host, "roomCreated");
+  host.emit("createRoom", { name: "ホスト" });
+  const { roomId } = await createdPromise;
+  const joinedPromise = once(host, "roomUpdated");
+  guest.emit("joinRoom", { name: "ゲスト", roomId });
+  await joinedPromise;
+
+  const selectionPromise = once(host, "orderSelectionStarted");
+  host.emit("startGame");
+  const selection = await selectionPromise;
+  assert.equal(selection.status, "orderSelection");
+  assert.equal(selection.orderCards.length, 2);
+  assert.equal(selection.orderCards.every((card) => card.value === undefined), true, "values stay secret while choosing");
+
+  const hostChoicePromise = once(host, "orderCardChosen");
+  host.emit("chooseOrderCard", { cardId: selection.orderCards[0].id });
+  const hostChoice = await hostChoicePromise;
+  assert.equal(hostChoice.orderCards[0].chosenBy, host.id);
+
+  const revealPromise = once(host, "orderRevealed");
+  guest.emit("chooseOrderCard", { cardId: selection.orderCards[1].id });
+  const revealed = await revealPromise;
+  assert.equal(revealed.status, "orderResult");
+  assert.equal(revealed.orderCards.every((card) => card.value !== undefined), true);
+  assert.equal(new Set(revealed.turnOrder).size, 2);
+  assert.deepEqual(revealed.turnOrder, [host.id, guest.id], "the joker holder goes first");
+
+  const started = await once(host, "gameStarted");
+  assert.equal(started.status, "playing");
+  assert.equal(started.currentPlayerId, host.id);
+});
+
+test("the order game automatically chooses for players when time expires", async (t) => {
+  const game = createServerApplication({ random: () => 0.25, orderChoiceMs: 15, orderRevealMs: 5 });
+  const address = await game.start();
+  const url = `http://127.0.0.1:${address.port}`;
+  t.after(() => game.close());
+  const host = await connect(url);
+  const guest = await connect(url);
+  t.after(() => { host.close(); guest.close(); });
+
+  const createdPromise = once(host, "roomCreated");
+  host.emit("createRoom", { name: "A" });
+  const { roomId } = await createdPromise;
+  const joinedPromise = once(host, "roomUpdated");
+  guest.emit("joinRoom", { name: "B", roomId });
+  await joinedPromise;
+  const revealPromise = once(host, "orderRevealed");
+  host.emit("startGame");
+  const revealed = await revealPromise;
+
+  assert.equal(revealed.orderCards.every((card) => card.chosenBy), true);
+  assert.equal(new Set(revealed.orderCards.map((card) => card.chosenBy)).size, 2);
+  assert.equal(revealed.turnOrder.length, 2);
+  assert.equal((await once(host, "gameStarted")).status, "playing");
 });
 
 test("server-generated card layout stays within bounds and avoids excessive overlap", () => {
@@ -274,9 +351,11 @@ test("joker pair awards two points, reveals remaining cards, then locks them aga
   host.emit("flipCard", { index: jokers[0] });
   await firstFlip;
   const activatedPromise = once(host, "jokerActivated");
+  const guestActivatedPromise = once(guest, "jokerActivated");
   host.emit("flipCard", { index: jokers[1] });
-  const activated = await activatedPromise;
+  const [activated, guestActivated] = await Promise.all([activatedPromise, guestActivatedPromise]);
   assert.equal(activated.revealAll, true);
+  assert.equal(guestActivated.revealAll, true, "the opponent receives the joker announcement event");
   assert.equal(activated.isProcessing, true);
   assert.ok(activated.revealEndsAt > Date.now());
   assert.equal(activated.players.find((player) => player.id === host.id).score, 2);
