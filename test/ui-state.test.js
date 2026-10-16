@@ -93,6 +93,7 @@ function baseState(overrides = {}) {
     selectedCards: [],
     isProcessing: false,
     revealAll: false,
+    revealEndsAt: null,
     remainingPairs: 17,
     message: "",
     winners: [],
@@ -211,6 +212,26 @@ test("OBS screen keeps the game start overlay hidden", () => {
 
   assert.equal(elements.get("watchProgress").classList.contains("hidden"), false);
   assert.equal(elements.get("watchEffect").classList.contains("hidden"), true);
+});
+
+test("player, watcher, and OBS countdowns use the shared server reveal deadline", () => {
+  const revealState = baseState({
+    status: "playing",
+    revealAll: true,
+    isProcessing: true,
+    revealEndsAt: Date.now() + 6000
+  });
+  const playerUi = runBrowserScript("client.js", "host");
+  playerUi.socket.receive("gameStarted", revealState);
+  assert.match(playerUi.elements.get("revealTimer").innerHTML, /<strong>6<\/strong>/);
+
+  const watcherUi = runBrowserScript("watch.js", "watcher", { pathname: "/watch/1234", search: "" });
+  watcherUi.socket.receive("watchJoined", revealState);
+  assert.match(watcherUi.elements.get("watchRevealTimer").innerHTML, /<strong>6<\/strong>/);
+
+  const obsUi = runBrowserScript("watch.js", "watcher", { pathname: "/watch/1234", search: "?obs=1" });
+  obsUi.socket.receive("watchJoined", revealState);
+  assert.match(obsUi.elements.get("watchRevealTimer").innerHTML, /<strong>6<\/strong>/);
 });
 
 test("card placement transforms the clickable card while flip animation stays on its child", () => {

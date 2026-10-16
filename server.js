@@ -8,8 +8,10 @@ const { Server } = require("socket.io");
 
 const MAX_PLAYERS = 4;
 const MIN_PLAYERS = 2;
-const PAIR_FAIL_DELAY = 1200;
-const JOKER_REVEAL_DELAY = 3000;
+const CARD_DISPLAY_TIMINGS = Object.freeze({
+  mismatchMs: 2200,
+  jokerRevealMs: 6000
+});
 const ROOM_DISCONNECT_GRACE_MS = 60_000;
 const CARD_LAYOUT = Object.freeze({
   X_OFFSET_MAX: 30,
@@ -147,8 +149,8 @@ function createApplication(options = {}) {
   const io = new Server(server, { cors: { origin: false } });
   const rooms = new Map();
   const random = options.random || Math.random;
-  const failDelay = options.failDelay ?? PAIR_FAIL_DELAY;
-  const jokerDelay = options.jokerDelay ?? JOKER_REVEAL_DELAY;
+  const failDelay = options.failDelay ?? CARD_DISPLAY_TIMINGS.mismatchMs;
+  const jokerDelay = options.jokerDelay ?? CARD_DISPLAY_TIMINGS.jokerRevealMs;
   const disconnectGraceMs = options.disconnectGraceMs ?? ROOM_DISCONNECT_GRACE_MS;
   const pendingDisconnects = new Map();
 
@@ -208,6 +210,7 @@ function createApplication(options = {}) {
       selectedCards: [...room.selectedCards],
       isProcessing: room.isProcessing,
       revealAll: room.revealAll,
+      revealEndsAt: room.revealEndsAt,
       remainingPairs: room.cards.length
         ? room.cards.filter((card) => !card.matched).length / 2
         : 17,
@@ -232,6 +235,7 @@ function createApplication(options = {}) {
     room.status = "finished";
     room.isProcessing = false;
     room.revealAll = false;
+    room.revealEndsAt = null;
     const ranking = [...room.players].sort((a, b) => b.score - a.score);
     let lastScore = null;
     let rank = 0;
@@ -313,6 +317,7 @@ function createApplication(options = {}) {
     room.currentPlayerIndex = Math.max(room.currentPlayerIndex, 0);
     room.isProcessing = false;
     room.revealAll = false;
+    room.revealEndsAt = null;
     room.message = "";
     room.winners = [];
     room.players.forEach((player) => {
@@ -330,6 +335,7 @@ function createApplication(options = {}) {
     room.currentPlayerIndex = 0;
     room.isProcessing = false;
     room.revealAll = false;
+    room.revealEndsAt = null;
     room.message = "";
     room.winners = [];
     room.players.forEach((player) => {
@@ -354,6 +360,7 @@ function createApplication(options = {}) {
         room.selectedCards = [];
         room.isProcessing = false;
         room.revealAll = false;
+        room.revealEndsAt = null;
         room.message = "";
       }
       room.players.splice(playerIndex, 1);
@@ -427,6 +434,7 @@ function createApplication(options = {}) {
         currentPlayerIndex: 0,
         isProcessing: false,
         revealAll: false,
+        revealEndsAt: null,
         message: "",
         winners: [],
         roundId: 0
@@ -529,10 +537,12 @@ function createApplication(options = {}) {
 
         if (first.joker) {
           room.revealAll = true;
+          room.revealEndsAt = Date.now() + jokerDelay;
           broadcast(room, "jokerActivated");
           setTimeout(() => {
             if (!rooms.has(room.id) || room.roundId !== roundId || room.status !== "playing") return;
             room.revealAll = false;
+            room.revealEndsAt = null;
             room.isProcessing = false;
             room.message = "";
             ensureCurrentConnected(room);
@@ -601,6 +611,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  CARD_DISPLAY_TIMINGS,
   CARD_LAYOUT,
   applyCardLayout,
   createApplication,

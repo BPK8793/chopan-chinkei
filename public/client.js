@@ -130,14 +130,14 @@ function renderRevealTimer() {
     $("revealTimer").classList.add("hidden");
     return;
   }
-  let seconds = 3;
+  const revealEndsAt = Number(state.revealEndsAt);
+  const updateTimer = () => {
+    const seconds = Math.max(0, Math.ceil((revealEndsAt - Date.now()) / 1000));
+    $("revealTimer").innerHTML = `全カード公開 <strong>${seconds}</strong>`;
+  };
   $("revealTimer").classList.remove("hidden");
-  $("revealTimer").innerHTML = `全カード公開 <strong>${seconds}</strong>`;
-  revealInterval = setInterval(() => {
-    seconds -= 1;
-    if (seconds > 0) $("revealTimer").innerHTML = `全カード公開 <strong>${seconds}</strong>`;
-    else clearInterval(revealInterval);
-  }, 1000);
+  updateTimer();
+  revealInterval = setInterval(updateTimer, 250);
 }
 
 function renderResults() {

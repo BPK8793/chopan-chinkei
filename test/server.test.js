@@ -4,6 +4,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { io: createClient } = require("socket.io-client");
 const {
+  CARD_DISPLAY_TIMINGS,
   CARD_LAYOUT,
   createApplication,
   createCardLayout,
@@ -30,6 +31,12 @@ test("deck has 16 normal pairs and one joker pair", () => {
   assert.equal(counts.size, 17);
   counts.forEach((count) => assert.equal(count, 2));
   assert.equal(deck.filter((card) => card.joker).length, 2);
+});
+
+test("card display timings are centralized at the requested durations", () => {
+  assert.equal(CARD_DISPLAY_TIMINGS.mismatchMs, 2200);
+  assert.equal(CARD_DISPLAY_TIMINGS.jokerRevealMs, 6000);
+  assert.equal(Object.isFrozen(CARD_DISPLAY_TIMINGS), true);
 });
 
 test("server-generated card layout stays within bounds and avoids excessive overlap", () => {
@@ -271,11 +278,18 @@ test("joker pair awards two points, reveals remaining cards, then locks them aga
   const activated = await activatedPromise;
   assert.equal(activated.revealAll, true);
   assert.equal(activated.isProcessing, true);
+  assert.ok(activated.revealEndsAt > Date.now());
   assert.equal(activated.players.find((player) => player.id === host.id).score, 2);
   assert.equal(activated.cards.filter((card) => !card.matched).every((card) => card.name), true);
 
+  const blockedCard = room.cards.findIndex((card) => !card.matched);
+  host.emit("flipCard", { index: blockedCard });
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.deepEqual(room.selectedCards, [], "card input stays locked during the joker reveal");
+
   const locked = await once(host, "turnChanged");
   assert.equal(locked.revealAll, false);
+  assert.equal(locked.revealEndsAt, null);
   assert.equal(locked.isProcessing, false);
   assert.equal(locked.currentPlayerId, host.id);
   assert.equal(locked.cards.filter((card) => !card.matched).every((card) => !card.name), true);

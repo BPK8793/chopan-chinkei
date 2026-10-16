@@ -42,14 +42,14 @@ function renderWatchTimer() {
     timer.classList.add("hidden");
     return;
   }
-  let seconds = 3;
+  const revealEndsAt = Number(watchState.revealEndsAt);
+  const updateTimer = () => {
+    const seconds = Math.max(0, Math.ceil((revealEndsAt - Date.now()) / 1000));
+    timer.innerHTML = `全カード公開 <strong>${seconds}</strong>`;
+  };
   timer.classList.remove("hidden");
-  timer.innerHTML = `全カード公開 <strong>${seconds}</strong>`;
-  watchRevealInterval = setInterval(() => {
-    seconds -= 1;
-    if (seconds > 0) timer.innerHTML = `全カード公開 <strong>${seconds}</strong>`;
-    else clearInterval(watchRevealInterval);
-  }, 1000);
+  updateTimer();
+  watchRevealInterval = setInterval(updateTimer, 250);
 }
 
 function renderWatchResults() {
