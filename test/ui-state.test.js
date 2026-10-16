@@ -404,10 +404,10 @@ test("joker chance uses one slower and higher special announcement", () => {
   controller.handleGameEvent("roomUpdated", activated, activated, { selfId: "guest" });
 
   assert.equal(spoken.length, 1);
-  assert.equal(spoken[0].text, "はげちょぱ！ チャーーーーンス！");
+  assert.equal(spoken[0].text, "ハゲチョパ、チャーーーンス！");
   assert.equal(spoken[0].lang, "ja-JP");
-  assert.equal(spoken[0].rate, 0.92);
-  assert.equal(spoken[0].pitch, 1.45);
+  assert.equal(spoken[0].rate, 0.9);
+  assert.equal(spoken[0].pitch, 1.18);
   assert.equal(spoken[0].volume, 0.55);
 });
 

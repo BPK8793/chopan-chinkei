@@ -151,7 +151,8 @@
       play(eventName);
       const jokerJustActivated = eventName === "jokerActivated" && nextState?.revealAll && !previousState?.revealAll;
       if (jokerJustActivated) {
-        speak("はげちょぱ！ チャーーーーンス！", { rate: 0.92, pitch: 1.45, setting: "effects" });
+        // 読点で短く間を置き、長音を重ねてイベントらしい「チャーンス」を作る。
+        speak("ハゲチョパ、チャーーーンス！", { rate: 0.9, pitch: 1.18, setting: "effects" });
       }
       if (!nextState || nextState.status !== "playing") return;
       const current = nextState.players?.find((player) => player.id === nextState.currentPlayerId);
