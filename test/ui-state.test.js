@@ -377,6 +377,16 @@ test("all requested mp3 assets and audio controls are present", () => {
   assert.match(watchHtml, /id="watchSoundVolume"/);
 });
 
+test("joker chance uses a short burst message before the unobtrusive countdown", () => {
+  const playerHtml = fs.readFileSync(path.join(__dirname, "..", "public", "index.html"), "utf8");
+  const watchHtml = fs.readFileSync(path.join(__dirname, "..", "public", "watch.html"), "utf8");
+  const styles = fs.readFileSync(path.join(__dirname, "..", "public", "style.css"), "utf8");
+  assert.match(playerHtml, /id="jokerChanceBurst"[^>]*>[\s\S]*はげちょぱ[\s\S]*チャーーーーンス!!/);
+  assert.match(watchHtml, /id="watchJokerChanceBurst"[^>]*>[\s\S]*はげちょぱ[\s\S]*チャーーーーンス!!/);
+  assert.match(styles, /animation:\s*jokerChanceBurst 1\.05s/);
+  assert.match(styles, /\.joker-chance-burst\s*{[^}]*pointer-events:\s*none/s);
+});
+
 test("joker countdown stays outside the card grid and ignores pointer input", () => {
   const styles = fs.readFileSync(path.join(__dirname, "..", "public", "style.css"), "utf8");
   const timerStyles = styles.slice(styles.indexOf(".reveal-timer {"), styles.indexOf(".reveal-timer::before"));
@@ -396,14 +406,19 @@ test("player, watcher, and OBS countdowns use the shared server reveal deadline"
   const playerUi = runBrowserScript("client.js", "host");
   playerUi.socket.receive("gameStarted", revealState);
   assert.match(playerUi.elements.get("revealTimer").innerHTML, /<strong>6<\/strong>/);
+  assert.match(playerUi.elements.get("revealTimer").innerHTML, /はげちょぱチャンス/);
+  assert.equal(playerUi.elements.get("jokerChanceBurst").classList.contains("hidden"), false);
+  assert.equal(playerUi.elements.get("effectMessage").classList.contains("hidden"), true);
 
   const watcherUi = runBrowserScript("watch.js", "watcher", { pathname: "/watch/1234", search: "" });
   watcherUi.socket.receive("watchJoined", revealState);
   assert.match(watcherUi.elements.get("watchRevealTimer").innerHTML, /<strong>6<\/strong>/);
+  assert.equal(watcherUi.elements.get("watchJokerChanceBurst").classList.contains("hidden"), false);
 
   const obsUi = runBrowserScript("watch.js", "watcher", { pathname: "/watch/1234", search: "?obs=1" });
   obsUi.socket.receive("watchJoined", revealState);
   assert.match(obsUi.elements.get("watchRevealTimer").innerHTML, /<strong>6<\/strong>/);
+  assert.equal(obsUi.elements.get("watchJokerChanceBurst").classList.contains("hidden"), false);
 });
 
 test("card placement transforms the clickable card while flip animation stays on its child", () => {

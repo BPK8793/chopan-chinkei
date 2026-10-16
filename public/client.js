@@ -117,12 +117,13 @@ function renderGame() {
     ChopanCardView.updateCard(button, card, index, canFlip);
   });
 
-  if (state.message) {
+  if (state.message && !state.revealAll) {
     $("effectMessage").textContent = state.message;
     $("effectMessage").classList.remove("hidden");
   } else {
     $("effectMessage").classList.add("hidden");
   }
+  $("jokerChanceBurst").classList.toggle("hidden", !state.revealAll);
   renderRevealTimer();
 }
 
@@ -135,7 +136,9 @@ function renderRevealTimer() {
   const revealEndsAt = Number(state.revealEndsAt);
   const updateTimer = () => {
     const seconds = Math.max(0, Math.ceil((revealEndsAt - Date.now()) / 1000));
-    $("revealTimer").innerHTML = `全カード公開 <strong>${seconds}</strong>`;
+    $("revealTimer").innerHTML = seconds > 0
+      ? `★ はげちょぱチャンス　残り <strong>${seconds}</strong>秒`
+      : "チャンス終了！";
     soundController?.playCountdownTick(seconds, revealEndsAt);
   };
   $("revealTimer").classList.remove("hidden");

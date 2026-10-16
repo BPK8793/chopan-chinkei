@@ -54,7 +54,9 @@ function renderWatchTimer() {
   const revealEndsAt = Number(watchState.revealEndsAt);
   const updateTimer = () => {
     const seconds = Math.max(0, Math.ceil((revealEndsAt - Date.now()) / 1000));
-    timer.innerHTML = `全カード公開 <strong>${seconds}</strong>`;
+    timer.innerHTML = seconds > 0
+      ? `★ はげちょぱチャンス　残り <strong>${seconds}</strong>秒`
+      : "チャンス終了！";
     watchSoundController?.playCountdownTick(seconds, revealEndsAt);
   };
   timer.classList.remove("hidden");
@@ -110,12 +112,13 @@ function renderWatch(nextState, eventName = "roomUpdated") {
   }
 
   const effect = watchElement("watchEffect");
-  if (watchState.message && watchState.status !== "finished") {
+  if (watchState.message && watchState.status !== "finished" && !watchState.revealAll) {
     effect.textContent = watchState.message;
     effect.classList.remove("hidden");
   } else {
     effect.classList.add("hidden");
   }
+  watchElement("watchJokerChanceBurst").classList.toggle("hidden", !watchState.revealAll);
   renderWatchTimer();
   renderWatchResults();
 }
