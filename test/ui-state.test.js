@@ -42,6 +42,7 @@ class FakeElement {
   replaceChildren(...children) { this.children = children; }
   addEventListener(event, handler) { this.listeners.set(event, handler); }
   click() { this.listeners.get("click")?.({ target: this }); }
+  remove() { this.removed = true; }
   setAttribute() {}
 }
 
@@ -265,13 +266,44 @@ test("all four chopa fronts prefer their numbered image and keep text as fallbac
     };
     const button = window.ChopanCardView.createCard(card, number - 1, null);
     const front = button.children[0].children[1];
-    const [image, fallback] = front.children;
+    const image = front.children[1];
+    const fallback = front.children[2];
 
     assert.equal(image.src, `/images/chopa/chopa_${number}.png`);
     assert.equal(fallback.children[0].textContent, "ちょぱ");
+    assert.equal(front.children[0].children[0].textContent, number);
+    assert.equal(front.children[0].children[1].textContent, "♦");
+    assert.equal(front.children[3].textContent, "ちょぱ");
+    assert.equal(front.children[4].children[0].textContent, number);
     image.listeners.get("load")();
     assert.equal(image.classList.contains("hidden"), false);
     assert.equal(fallback.classList.contains("hidden"), true);
     assert.equal(front.classList.contains("has-image"), true);
   }
+});
+
+test("a missing character image leaves the text fallback visible", () => {
+  const { document } = createDom();
+  const window = {};
+  vm.runInNewContext(
+    fs.readFileSync(path.join(__dirname, "..", "public", "card-view.js"), "utf8"),
+    { document, window },
+    { filename: "card-view.js" }
+  );
+  const button = window.ChopanCardView.createCard({
+    character: "missing",
+    name: "フォールバック",
+    mark: "♣",
+    number: 1,
+    joker: false
+  }, 0, null);
+  const front = button.children[0].children[1];
+  const image = front.children[1];
+  const fallback = front.children[2];
+
+  image.listeners.get("error")();
+  assert.equal(image.removed, true);
+  assert.equal(fallback.classList.contains("hidden"), false);
+  assert.equal(fallback.children[0].textContent, "フォールバック");
+  assert.equal(front.classList.contains("has-image"), false);
 });

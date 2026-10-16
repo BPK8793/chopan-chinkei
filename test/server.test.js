@@ -370,3 +370,23 @@ test("all four supplied chopa images are served with the expected dimensions", a
     assert.equal(image[25], 6, "the supplied PNG keeps its transparent background");
   }
 });
+
+test("all generated chinchilla character variants are served as transparent PNGs", async (t) => {
+  const game = createApplication();
+  const address = await game.start();
+  const url = `http://127.0.0.1:${address.port}`;
+  t.after(() => game.close());
+
+  for (const character of ["goma", "rei", "guri"]) {
+    for (let number = 1; number <= 4; number += 1) {
+      const response = await fetch(`${url}/images/${character}/${character}_${number}.png`);
+      assert.equal(response.status, 200, `${character}_${number} should be served`);
+      assert.match(response.headers.get("content-type"), /^image\/png/);
+      const image = Buffer.from(await response.arrayBuffer());
+      assert.equal(image.subarray(1, 4).toString(), "PNG");
+      assert.ok(image.readUInt32BE(16) >= 1000);
+      assert.ok(image.readUInt32BE(20) >= 1000);
+      assert.equal(image[25], 6, `${character}_${number} should preserve transparency`);
+    }
+  }
+});

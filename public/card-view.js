@@ -33,13 +33,27 @@
     number.textContent = card.number ?? "★";
     fallback.append(name, mark, number);
 
+    const createCorner = (position) => {
+      const corner = document.createElement("span");
+      corner.className = `card-corner ${position}`;
+      const cornerNumber = document.createElement("b");
+      cornerNumber.textContent = card.number ?? "★";
+      const cornerMark = document.createElement("i");
+      cornerMark.textContent = card.mark;
+      corner.append(cornerNumber, cornerMark);
+      return corner;
+    };
+    const imageName = document.createElement("span");
+    imageName.className = "card-image-name";
+    imageName.textContent = card.name;
+
     image.addEventListener("load", () => {
       image.classList.remove("hidden");
       fallback.classList.add("hidden");
       front.classList.add("has-image");
     }, { once: true });
     image.addEventListener("error", () => image.remove(), { once: true });
-    front.append(image, fallback);
+    front.append(createCorner("top-left"), image, fallback, imageName, createCorner("bottom-right"));
     return front;
   }
 
