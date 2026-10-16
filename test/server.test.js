@@ -93,6 +93,48 @@ test("room creation, joining and host-only game start are synchronized", async (
   assert.equal(started.message, "", "game start does not emit a large overlay message");
 });
 
+test("a waiting room remains joinable and watchable during a transient host disconnect", async (t) => {
+  const game = createApplication({ disconnectGraceMs: 500 });
+  const address = await game.start();
+  const url = `http://127.0.0.1:${address.port}`;
+  t.after(() => game.close());
+
+  const host = await connect(url);
+  const createdPromise = once(host, "roomCreated");
+  host.emit("createRoom", { name: "ホスト" });
+  const created = await createdPromise;
+  host.close();
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    if (game.rooms.get(created.roomId)?.players[0]?.connected === false) break;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  assert.equal(game.rooms.has(created.roomId), true, "room survives the reconnect grace period");
+
+  const watcher = await connect(url);
+  t.after(() => watcher.close());
+  const watchedPromise = once(watcher, "watchJoined");
+  watcher.emit("joinWatch", { roomId: created.roomId });
+  assert.equal((await watchedPromise).roomId, created.roomId);
+
+  const guest = await connect(url);
+  t.after(() => guest.close());
+  const joinedPromise = once(guest, "roomJoined");
+  guest.emit("joinRoom", { name: "ゲスト", roomId: created.roomId });
+  assert.equal((await joinedPromise).players.length, 2);
+
+  const resumedHost = await connect(url);
+  t.after(() => resumedHost.close());
+  const resumedPromise = once(resumedHost, "roomResumed");
+  resumedHost.emit("resumeRoom", {
+    roomId: created.roomId,
+    resumeToken: created.resumeToken
+  });
+  const resumed = await resumedPromise;
+  assert.equal(resumed.hostId, resumedHost.id);
+  assert.equal(resumed.players.find((player) => player.name === "ホスト").connected, true);
+});
+
 test("server rejects an out-of-turn flip and resolves a normal pair", async (t) => {
   const game = createApplication({ random: () => 0.23, failDelay: 10, jokerDelay: 15 });
   const address = await game.start();

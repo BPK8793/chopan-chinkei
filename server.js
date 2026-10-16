@@ -10,6 +10,7 @@ const MAX_PLAYERS = 4;
 const MIN_PLAYERS = 2;
 const PAIR_FAIL_DELAY = 1200;
 const JOKER_REVEAL_DELAY = 3000;
+const ROOM_DISCONNECT_GRACE_MS = 60_000;
 const CARD_LAYOUT = Object.freeze({
   X_OFFSET_MAX: 30,
   Y_OFFSET_MAX: 30,
@@ -148,6 +149,8 @@ function createApplication(options = {}) {
   const random = options.random || Math.random;
   const failDelay = options.failDelay ?? PAIR_FAIL_DELAY;
   const jokerDelay = options.jokerDelay ?? JOKER_REVEAL_DELAY;
+  const disconnectGraceMs = options.disconnectGraceMs ?? ROOM_DISCONNECT_GRACE_MS;
+  const pendingDisconnects = new Map();
 
   app.get("/watch/:roomId", (_req, res) => {
     res.sendFile(path.join(__dirname, "public", "watch.html"));
@@ -257,6 +260,50 @@ function createApplication(options = {}) {
     if (!currentPlayer(room)?.connected) advanceTurn(room);
   }
 
+  function cancelDisconnectCleanup(player) {
+    const timer = pendingDisconnects.get(player.resumeToken);
+    if (!timer) return;
+    clearTimeout(timer);
+    pendingDisconnects.delete(player.resumeToken);
+  }
+
+  function closeEmptyRoom(room) {
+    if (activePlayers(room).length > 0) return false;
+    room.players.forEach(cancelDisconnectCleanup);
+    io.to(`watch:${room.id}`).emit("watchUnavailable", { message: "このルームは終了しました" });
+    rooms.delete(room.id);
+    return true;
+  }
+
+  function scheduleDisconnectCleanup(room, player) {
+    cancelDisconnectCleanup(player);
+    const timer = setTimeout(() => {
+      pendingDisconnects.delete(player.resumeToken);
+      const currentRoom = rooms.get(room.id);
+      if (!currentRoom) return;
+      const playerIndex = currentRoom.players.findIndex(
+        (candidate) => candidate.resumeToken === player.resumeToken
+      );
+      if (playerIndex === -1 || currentRoom.players[playerIndex].connected) return;
+
+      if (currentRoom.status === "playing") {
+        closeEmptyRoom(currentRoom);
+        return;
+      }
+
+      const [removedPlayer] = currentRoom.players.splice(playerIndex, 1);
+      if (currentRoom.currentPlayerIndex >= currentRoom.players.length) {
+        currentRoom.currentPlayerIndex = 0;
+      }
+      if (currentRoom.hostSocketId === removedPlayer.id && activePlayers(currentRoom).length > 0) {
+        currentRoom.hostSocketId = activePlayers(currentRoom)[0].id;
+      }
+      if (!closeEmptyRoom(currentRoom)) broadcast(currentRoom);
+    }, disconnectGraceMs);
+    timer.unref?.();
+    pendingDisconnects.set(player.resumeToken, timer);
+  }
+
   function startRound(room) {
     room.roundId += 1;
     room.status = "playing";
@@ -299,7 +346,8 @@ function createApplication(options = {}) {
     const player = room.players[playerIndex];
     socket.leave(room.id);
 
-    if (room.status === "waiting" || explicit && room.status === "finished") {
+    if (explicit && (room.status === "waiting" || room.status === "finished")) {
+      cancelDisconnectCleanup(player);
       room.players.splice(playerIndex, 1);
       if (room.currentPlayerIndex >= room.players.length) room.currentPlayerIndex = 0;
     } else {
@@ -309,14 +357,18 @@ function createApplication(options = {}) {
         room.selectedCards = [];
         advanceTurn(room);
       }
+      if (!explicit) scheduleDisconnectCleanup(room, player);
     }
 
     if (activePlayers(room).length === 0) {
-      io.to(`watch:${room.id}`).emit("watchUnavailable", { message: "このルームは終了しました" });
-      rooms.delete(room.id);
+      if (!explicit) {
+        broadcast(room);
+        return;
+      }
+      closeEmptyRoom(room);
       return;
     }
-    if (room.hostSocketId === player.id) {
+    if (room.hostSocketId === player.id && (explicit || room.status === "playing")) {
       room.hostSocketId = activePlayers(room)[0].id;
     }
     broadcast(room);
@@ -413,6 +465,7 @@ function createApplication(options = {}) {
       }
 
       const previousSocketId = player.id;
+      cancelDisconnectCleanup(player);
       if (room.hostSocketId === previousSocketId) room.hostSocketId = socket.id;
       player.id = socket.id;
       player.connected = true;
