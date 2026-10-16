@@ -136,6 +136,7 @@ function renderRevealTimer() {
   const updateTimer = () => {
     const seconds = Math.max(0, Math.ceil((revealEndsAt - Date.now()) / 1000));
     $("revealTimer").innerHTML = `全カード公開 <strong>${seconds}</strong>`;
+    soundController?.playCountdownTick(seconds, revealEndsAt);
   };
   $("revealTimer").classList.remove("hidden");
   updateTimer();

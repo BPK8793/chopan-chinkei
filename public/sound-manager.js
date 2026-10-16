@@ -35,6 +35,8 @@
     const unavailableFiles = new Set();
     let unlocked = false;
     let audioContext = null;
+    let lastCountdownId = null;
+    let lastCountdownSecond = null;
 
     Object.entries(SOUND_PATHS).forEach(([eventName, path]) => {
       if (typeof Audio !== "function") return;
@@ -104,6 +106,32 @@
       }
     }
 
+    function playCountdownTick(seconds, countdownId) {
+      if (!settings.effects || !unlocked || !Number.isInteger(seconds) || seconds < 0) return;
+      const nextCountdownId = String(countdownId || "countdown");
+      if (lastCountdownId === nextCountdownId && lastCountdownSecond === seconds) return;
+      lastCountdownId = nextCountdownId;
+      lastCountdownSecond = seconds;
+
+      const context = ensureContext();
+      if (!context || context.state === "suspended") return;
+      try {
+        const urgent = seconds <= 3;
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        const start = context.currentTime;
+        const duration = seconds === 0 ? 0.22 : urgent ? 0.075 : 0.045;
+        oscillator.type = seconds === 0 ? "sawtooth" : "square";
+        oscillator.frequency.setValueAtTime(seconds === 0 ? 1320 : urgent ? 1050 : 760, start);
+        if (seconds === 0) oscillator.frequency.exponentialRampToValueAtTime(520, start + duration);
+        gain.gain.setValueAtTime(Math.max(0.0001, 0.045 * settings.volume), start);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+        oscillator.connect(gain).connect(context.destination);
+        oscillator.start(start);
+        oscillator.stop(start + duration + 0.01);
+      } catch { /* カウント音が使えなくてもゲームは続行 */ }
+    }
+
     function speak(name) {
       if (!settings.speech || !unlocked || !name || !("speechSynthesis" in window)) return;
       try {
@@ -167,7 +195,7 @@
     }
 
     bindControls();
-    return { handleGameEvent, play, settings, unlock };
+    return { handleGameEvent, play, playCountdownTick, settings, unlock };
   }
 
   window.ChopanAudio = { createSoundController, SOUND_PATHS };

@@ -55,6 +55,7 @@ function renderWatchTimer() {
   const updateTimer = () => {
     const seconds = Math.max(0, Math.ceil((revealEndsAt - Date.now()) / 1000));
     timer.innerHTML = `全カード公開 <strong>${seconds}</strong>`;
+    watchSoundController?.playCountdownTick(seconds, revealEndsAt);
   };
   timer.classList.remove("hidden");
   updateTimer();

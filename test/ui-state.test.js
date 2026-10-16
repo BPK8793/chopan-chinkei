@@ -52,6 +52,7 @@ function runSoundManager(mode = "player") {
   const documentListeners = new Map();
   const played = [];
   const spoken = [];
+  const synthesized = [];
   const elements = new Map();
   class FakeAudio {
     constructor(src) { this.src = src; }
@@ -66,6 +67,29 @@ function runSoundManager(mode = "player") {
     cancel: () => {},
     speak: (utterance) => spoken.push(utterance)
   };
+  class FakeAudioContext {
+    constructor() {
+      this.currentTime = 0;
+      this.state = "running";
+      this.destination = {};
+    }
+    createOscillator() {
+      return {
+        type: "",
+        frequency: { setValueAtTime() {}, exponentialRampToValueAtTime() {} },
+        connect: (next) => next,
+        start: () => synthesized.push("start"),
+        stop() {}
+      };
+    }
+    createGain() {
+      return {
+        gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} },
+        connect: (next) => next
+      };
+    }
+    resume() { return Promise.resolve(); }
+  }
   const document = {
     addEventListener: (event, handler) => documentListeners.set(event, handler),
     getElementById: (id) => {
@@ -81,7 +105,7 @@ function runSoundManager(mode = "player") {
       getItem: (key) => storage.get(key) || null,
       setItem: (key, value) => storage.set(key, value)
     },
-    window: { speechSynthesis }
+    window: { speechSynthesis, AudioContext: FakeAudioContext }
   };
   vm.runInNewContext(
     fs.readFileSync(path.join(__dirname, "..", "public", "sound-manager.js"), "utf8"),
@@ -89,7 +113,7 @@ function runSoundManager(mode = "player") {
     { filename: "sound-manager.js" }
   );
   const controller = context.window.ChopanAudio.createSoundController({ mode });
-  return { controller, documentListeners, elements, played, spoken, storage };
+  return { controller, documentListeners, elements, played, spoken, storage, synthesized };
 }
 
 class FakeSocket {
@@ -299,6 +323,21 @@ test("turn speech runs once when an opponent hands the turn to this player", () 
   assert.equal(spoken[0].rate, 1.3125);
 });
 
+test("joker countdown ticks once per displayed second and respects mute", () => {
+  const { controller, documentListeners, elements, synthesized } = runSoundManager();
+  documentListeners.get("pointerdown")();
+  controller.playCountdownTick(6, 12345);
+  controller.playCountdownTick(6, 12345);
+  controller.playCountdownTick(5, 12345);
+  assert.equal(synthesized.length, 2, "the 250ms timer refresh does not duplicate a second");
+
+  const effects = elements.get("soundEffectsEnabled");
+  effects.checked = false;
+  effects.listeners.get("change")();
+  controller.playCountdownTick(4, 12345);
+  assert.equal(synthesized.length, 2, "countdown is silent when effects are muted");
+});
+
 test("sound controls persist mute, speech, and volume per screen mode", () => {
   const { controller, documentListeners, elements, played, storage } = runSoundManager("watch");
   assert.equal(controller.settings.effects, true);
@@ -336,6 +375,15 @@ test("all requested mp3 assets and audio controls are present", () => {
   assert.match(watchHtml, /id="watchSoundEffectsEnabled"/);
   assert.match(watchHtml, /id="watchTurnSpeechEnabled"/);
   assert.match(watchHtml, /id="watchSoundVolume"/);
+});
+
+test("joker countdown stays outside the card grid and ignores pointer input", () => {
+  const styles = fs.readFileSync(path.join(__dirname, "..", "public", "style.css"), "utf8");
+  const timerStyles = styles.slice(styles.indexOf(".reveal-timer {"), styles.indexOf(".reveal-timer::before"));
+  assert.match(timerStyles, /margin:\s*-5px auto 5px/);
+  assert.match(timerStyles, /background:\s*rgba\(255,217,126,\.76\)/);
+  assert.match(timerStyles, /pointer-events:\s*none/);
+  assert.doesNotMatch(timerStyles, /position:\s*fixed/);
 });
 
 test("player, watcher, and OBS countdowns use the shared server reveal deadline", () => {
