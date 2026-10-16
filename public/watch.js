@@ -2,7 +2,8 @@
 
 const watchSocket = io();
 const watchRoomId = decodeURIComponent(location.pathname.split("/").filter(Boolean)[1] || "");
-const isObsMode = new URLSearchParams(location.search).get("obs") === "1";
+const watchKey = new URLSearchParams(location.search).get("key") || "";
+const isObsMode = location.pathname.startsWith("/obs/");
 const watchSoundController = window.ChopanAudio?.createSoundController({
   mode: isObsMode ? "obs" : "watch",
   ids: {
@@ -122,6 +123,7 @@ function renderWatchOrderGame() {
 }
 
 function renderWatch(nextState, eventName = "roomUpdated") {
+  document.body.classList.remove("watch-invalid");
   const previousState = watchState;
   watchSoundController?.handleGameEvent(eventName, nextState, previousState);
   watchState = nextState;
@@ -162,14 +164,10 @@ function renderWatch(nextState, eventName = "roomUpdated") {
 
 function joinWatchRoom() {
   watchElement("watchRoomCode").textContent = watchRoomId || "----";
-  watchSocket.emit("joinWatch", { roomId: watchRoomId });
+  watchSocket.emit("joinWatch", { roomId: watchRoomId, key: watchKey });
 }
 
 document.body.classList.toggle("obs-mode", isObsMode);
-watchElement("openObsButton").addEventListener("click", () => {
-  const obsUrl = `/watch/${encodeURIComponent(watchRoomId)}?obs=1`;
-  window.open(obsUrl, "_blank", "noopener");
-});
 
 watchSocket.on("connect", joinWatchRoom);
 watchSocket.on("disconnect", () => {
@@ -178,6 +176,7 @@ watchSocket.on("disconnect", () => {
   status.classList.remove("hidden");
 });
 watchSocket.on("watchUnavailable", ({ message }) => {
+  document.body.classList.add("watch-invalid");
   const status = watchElement("watchStatus");
   status.textContent = message;
   status.classList.add("error");

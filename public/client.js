@@ -5,6 +5,7 @@ let state = null;
 let toastTimer = null;
 let revealInterval = null;
 let orderInterval = null;
+let hostWatchAccess = null;
 
 const $ = (id) => document.getElementById(id);
 const screens = [$("homeScreen"), $("roomScreen"), $("gameScreen")];
@@ -43,6 +44,28 @@ function saveName() {
 
 function isHost() {
   return state?.hostId === socket.id;
+}
+
+function renderHostWatchControls() {
+  const visible = Boolean(isHost() && hostWatchAccess?.roomId === state?.roomId && hostWatchAccess.watchKey);
+  $("lobbyWatchControls").classList.toggle("hidden", !visible);
+  $("gameWatchControls").classList.toggle("hidden", !visible);
+}
+
+function watchUrl(kind) {
+  const path = kind === "obs" ? "obs" : "watch";
+  return `${window.location.origin}/${path}/${encodeURIComponent(state.roomId)}?key=${encodeURIComponent(hostWatchAccess.watchKey)}`;
+}
+
+async function copyWatchUrl(kind) {
+  if (!isHost() || !hostWatchAccess?.watchKey) return;
+  const label = kind === "obs" ? "OBS用URL" : "観戦URL";
+  try {
+    await navigator.clipboard.writeText(watchUrl(kind));
+    showToast(`${label}をコピーしました`);
+  } catch {
+    showToast(`${label}をコピーできませんでした`);
+  }
 }
 
 function renderPlayersBar() {
@@ -87,6 +110,7 @@ function renderLobby() {
   $("startHint").textContent = showStart
     ? (canStart ? "準備ができたらスタート！" : "あと1人で開始できます")
     : "ルーム作成者の開始を待っています";
+  renderHostWatchControls();
 }
 
 function renderGame() {
@@ -132,6 +156,7 @@ function renderGame() {
   }
   $("jokerChanceBurst").classList.toggle("hidden", !state.revealAll);
   renderRevealTimer();
+  renderHostWatchControls();
 }
 
 function renderOrderGame() {
@@ -147,6 +172,7 @@ function renderOrderGame() {
   $("revealTimer").classList.add("hidden");
   $("orderGame").classList.remove("hidden");
   renderPlayersBar();
+  renderHostWatchControls();
 
   const selectedByMe = state.orderCards.some((card) => card.chosenBy === socket.id);
   $("orderGameTitle").textContent = state.status === "orderResult" ? "順番決定！" : "運命の1枚を選ぼう！";
@@ -286,6 +312,10 @@ socket.on("errorMessage", ({ message }) => {
   if (state?.status === "waiting") renderLobby();
 });
 socket.on("resumeUnavailable", () => clearResumeCredentials());
+socket.on("hostWatchAccess", (access) => {
+  hostWatchAccess = access;
+  if (state) renderHostWatchControls();
+});
 
 $("createButton").addEventListener("click", () => socket.emit("createRoom", { name: saveName() }));
 $("joinButton").addEventListener("click", () => socket.emit("joinRoom", { name: saveName(), roomId: $("roomInput").value }));
@@ -295,20 +325,6 @@ function normalizeRoomInput(event) {
 
 $("roomInput").addEventListener("input", normalizeRoomInput);
 $("roomInput").addEventListener("keydown", (event) => { if (event.key === "Enter") $("joinButton").click(); });
-$("watchRoomInput").addEventListener("input", (event) => {
-  normalizeRoomInput(event);
-  $("watchInputError").classList.add("hidden");
-});
-$("watchRoomInput").addEventListener("keydown", (event) => { if (event.key === "Enter") $("watchButton").click(); });
-$("watchButton").addEventListener("click", () => {
-  const roomId = $("watchRoomInput").value.trim();
-  if (!/^\d{4}$/.test(roomId)) {
-    $("watchInputError").textContent = "4桁のルームコードを入力してください";
-    $("watchInputError").classList.remove("hidden");
-    return;
-  }
-  window.location.assign(`/watch/${roomId}`);
-});
 $("startButton").addEventListener("click", () => {
   // 二重送信を防ぎ、サーバーからの開始通知を待つ間もボタンを残さない。
   $("startButton").classList.add("hidden");
@@ -340,6 +356,10 @@ $("copyRoomButton").addEventListener("click", async () => {
   try { await navigator.clipboard.writeText(state.roomId); showToast("ルーム番号をコピーしました"); }
   catch { showToast(`ルーム番号は ${state.roomId} です`); }
 });
+$("copyLobbyWatchUrlButton").addEventListener("click", () => copyWatchUrl("watch"));
+$("copyLobbyObsUrlButton").addEventListener("click", () => copyWatchUrl("obs"));
+$("copyGameWatchUrlButton").addEventListener("click", () => copyWatchUrl("watch"));
+$("copyGameObsUrlButton").addEventListener("click", () => copyWatchUrl("obs"));
 $("rematchButton").addEventListener("click", () => socket.emit("requestRematch"));
 $("lobbyButton").addEventListener("click", () => socket.emit("returnToLobby"));
 $("topButton").addEventListener("click", () => {

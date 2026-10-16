@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#fffaf3">
   <title>観戦 | chopanとチン経衰弱</title>
   <link rel="stylesheet" href="/style.css">
-  <script>if (new URLSearchParams(location.search).get("obs") === "1") document.documentElement.classList.add("obs-page");</script>
+  <script>if (location.pathname.startsWith("/obs/")) document.documentElement.classList.add("obs-page");</script>
 </head>
 <body class="watch-body">
   <main class="watch-shell">
@@ -22,7 +22,6 @@
     <nav class="watch-controls" aria-label="観戦画面の操作">
       <a class="text-button watch-back" href="/">← トップへ戻る</a>
       <p>観戦専用画面です。カードやゲームの操作はできません。</p>
-      <button id="openObsButton" class="button obs-button" type="button">OBS用表示</button>
     </nav>
     <header class="watch-header">
       <div class="watch-brand">

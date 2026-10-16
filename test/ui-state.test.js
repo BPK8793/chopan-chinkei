@@ -179,13 +179,14 @@ function baseState(overrides = {}) {
 function runBrowserScript(filename, socketId, location = { pathname: "/", search: "" }) {
   const { document, elements } = createDom();
   const socket = new FakeSocket(socketId);
+  const clipboardWrites = [];
   const context = {
     document,
     io: () => socket,
     localStorage: { getItem: () => "", setItem: () => {}, removeItem: () => {} },
     location,
-    navigator: { clipboard: { writeText: async () => {} } },
-    window: { location: { assign: () => {}, reload: () => {} }, open: () => {} },
+    navigator: { clipboard: { writeText: async (value) => clipboardWrites.push(value) } },
+    window: { location: { origin: "https://game.example", assign: () => {}, reload: () => {} } },
     ChopanCardView: { createCard: () => new FakeElement(), updateCard: () => {} },
     URLSearchParams,
     clearInterval: () => {},
@@ -200,7 +201,7 @@ function runBrowserScript(filename, socketId, location = { pathname: "/", search
     context,
     { filename }
   );
-  return { socket, elements };
+  return { socket, elements, clipboardWrites };
 }
 
 test("start button is shown only to the waiting host and disappears on game start", () => {
@@ -234,6 +235,33 @@ test("start button stays hidden for a non-host and hides immediately after host 
   assert.equal(hostUi.socket.emitted.at(-1)[0], "startGame");
   hostUi.socket.receive("errorMessage", { message: "開始できません" });
   assert.equal(hostUi.elements.get("startButton").classList.contains("hidden"), false);
+});
+
+test("only the host sees copy controls and they copy complete keyed URLs", async () => {
+  const html = fs.readFileSync(path.join(__dirname, "..", "public", "index.html"), "utf8");
+  assert.doesNotMatch(html, /watchRoomInput|watchButton|観戦する/);
+
+  const guestUi = runBrowserScript("client.js", "guest");
+  guestUi.socket.receive("roomJoined", baseState());
+  guestUi.socket.receive("hostWatchAccess", { roomId: "1234", watchKey: "secret" });
+  assert.equal(guestUi.elements.get("lobbyWatchControls").classList.contains("hidden"), true);
+
+  const hostUi = runBrowserScript("client.js", "host");
+  hostUi.socket.receive("roomCreated", baseState());
+  assert.equal(hostUi.elements.get("lobbyWatchControls").classList.contains("hidden"), true);
+  hostUi.socket.receive("hostWatchAccess", { roomId: "1234", watchKey: "a_secure-key" });
+  assert.equal(hostUi.elements.get("lobbyWatchControls").classList.contains("hidden"), false);
+
+  hostUi.elements.get("copyLobbyWatchUrlButton").click();
+  hostUi.elements.get("copyLobbyObsUrlButton").click();
+  await Promise.resolve();
+  assert.deepEqual(hostUi.clipboardWrites, [
+    "https://game.example/watch/1234?key=a_secure-key",
+    "https://game.example/obs/1234?key=a_secure-key"
+  ]);
+
+  hostUi.socket.receive("gameStarted", baseState({ status: "playing" }));
+  assert.equal(hostUi.elements.get("gameWatchControls").classList.contains("hidden"), false);
 });
 
 test("the order mini-game lets each player choose once and displays the revealed order", () => {
@@ -299,8 +327,12 @@ test("watch screen has no start control and switches to read-only progress displ
   const { socket, elements } = runBrowserScript(
     "watch.js",
     "watcher",
-    { pathname: "/watch/1234", search: "" }
+    { pathname: "/watch/1234", search: "?key=secret" }
   );
+  socket.receive("connect");
+  assert.equal(socket.emitted[0][0], "joinWatch");
+  assert.equal(socket.emitted[0][1].roomId, "1234");
+  assert.equal(socket.emitted[0][1].key, "secret");
   socket.receive("watchJoined", baseState());
   assert.equal(elements.get("watchProgress").classList.contains("hidden"), true);
 
@@ -311,11 +343,23 @@ test("watch screen has no start control and switches to read-only progress displ
   assert.equal(elements.get("watchEffect").classList.contains("hidden"), true);
 });
 
+test("an invalid watch key hides all game information", () => {
+  const { socket, elements } = runBrowserScript(
+    "watch.js",
+    "watcher",
+    { pathname: "/watch/1234", search: "?key=wrong" }
+  );
+  socket.receive("watchUnavailable", { message: "観戦URLが無効です" });
+  assert.equal(elements.get("watchStatus").textContent, "観戦URLが無効です");
+  assert.equal(elements.get("body").classList.contains("watch-invalid"), true);
+  assert.equal(elements.get("watchCardGrid").children.length, 0);
+});
+
 test("watchers can follow the order mini-game without being able to choose", () => {
   const { socket, elements } = runBrowserScript(
     "watch.js",
     "watcher",
-    { pathname: "/watch/1234", search: "" }
+    { pathname: "/watch/1234", search: "?key=secret" }
   );
   socket.receive("orderSelectionStarted", baseState({
     status: "orderSelection",
@@ -348,7 +392,7 @@ test("OBS screen keeps the game start overlay hidden", () => {
   const { socket, elements } = runBrowserScript(
     "watch.js",
     "observer",
-    { pathname: "/watch/1234", search: "?obs=1" }
+    { pathname: "/obs/1234", search: "?key=secret" }
   );
 
   socket.receive("gameStarted", baseState({ status: "playing" }));
@@ -520,12 +564,12 @@ test("player, watcher, and OBS countdowns use the shared server reveal deadline"
   assert.equal(playerUi.elements.get("jokerChanceBurst").classList.contains("hidden"), false);
   assert.equal(playerUi.elements.get("effectMessage").classList.contains("hidden"), true);
 
-  const watcherUi = runBrowserScript("watch.js", "watcher", { pathname: "/watch/1234", search: "" });
+  const watcherUi = runBrowserScript("watch.js", "watcher", { pathname: "/watch/1234", search: "?key=secret" });
   watcherUi.socket.receive("watchJoined", revealState);
   assert.match(watcherUi.elements.get("watchRevealTimer").innerHTML, /<strong>6<\/strong>/);
   assert.equal(watcherUi.elements.get("watchJokerChanceBurst").classList.contains("hidden"), false);
 
-  const obsUi = runBrowserScript("watch.js", "watcher", { pathname: "/watch/1234", search: "?obs=1" });
+  const obsUi = runBrowserScript("watch.js", "watcher", { pathname: "/obs/1234", search: "?key=secret" });
   obsUi.socket.receive("watchJoined", revealState);
   assert.match(obsUi.elements.get("watchRevealTimer").innerHTML, /<strong>6<\/strong>/);
   assert.equal(obsUi.elements.get("watchJokerChanceBurst").classList.contains("hidden"), false);

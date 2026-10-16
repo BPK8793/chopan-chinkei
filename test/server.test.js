@@ -154,9 +154,14 @@ test("room creation, joining and host-only game start are synchronized", async (
   t.after(() => { host.close(); guest.close(); });
 
   const createdPromise = once(host, "roomCreated");
+  const hostAccessPromise = once(host, "hostWatchAccess");
   host.emit("createRoom", { name: "ホスト" });
   const created = await createdPromise;
+  const hostAccess = await hostAccessPromise;
   assert.match(created.roomId, /^\d{4}$/);
+  assert.equal(created.watchKey, undefined);
+  assert.equal(hostAccess.roomId, created.roomId);
+  assert.match(hostAccess.watchKey, /^[A-Za-z0-9_-]{43}$/);
 
   const joinedPromise = once(guest, "roomUpdated");
   guest.emit("joinRoom", { name: "ゲスト", roomId: created.roomId });
@@ -198,7 +203,10 @@ test("a waiting room remains joinable and watchable during a transient host disc
   const watcher = await connect(url);
   t.after(() => watcher.close());
   const watchedPromise = once(watcher, "watchJoined");
-  watcher.emit("joinWatch", { roomId: created.roomId });
+  watcher.emit("joinWatch", {
+    roomId: created.roomId,
+    key: game.rooms.get(created.roomId).watchKey
+  });
   assert.equal((await watchedPromise).roomId, created.roomId);
 
   const guest = await connect(url);
@@ -392,15 +400,22 @@ test("watchers are read-only, are not players, and receive live card updates", a
   await joinedPromise;
 
   const watchingPromise = once(watcher, "watchJoined");
-  watcher.emit("joinWatch", { roomId });
+  watcher.emit("joinWatch", { roomId, key: game.rooms.get(roomId).watchKey });
   const watching = await watchingPromise;
   assert.equal(watching.players.length, 2);
+  assert.equal(watching.watchKey, undefined);
   assert.equal(game.rooms.get(roomId).players.length, 2, "watcher is not added to players");
 
   const deniedPromise = once(watcher, "errorMessage");
   watcher.emit("joinRoom", { name: "侵入", roomId });
   assert.match((await deniedPromise).message, /観戦者/);
   assert.equal(game.rooms.get(roomId).players.length, 2);
+
+  const cardsBefore = game.rooms.get(roomId).selectedCards.length;
+  const flipDenied = once(watcher, "errorMessage");
+  watcher.emit("flipCard", { index: 0 });
+  assert.match((await flipDenied).message, /ルームに参加していません/);
+  assert.equal(game.rooms.get(roomId).selectedCards.length, cardsBefore);
 
   const watcherStarted = once(watcher, "gameStarted");
   host.emit("startGame");
@@ -448,7 +463,7 @@ test("players, late watchers, and rematches receive the authoritative room layou
   )), firstLayout);
 
   const lateJoin = once(watcher, "watchJoined");
-  watcher.emit("joinWatch", { roomId });
+  watcher.emit("joinWatch", { roomId, key: game.rooms.get(roomId).watchKey });
   const watchState = await lateJoin;
   assert.deepEqual(watchState.cards.map(({ xOffset, yOffset, rotation, zIndex }) => (
     { xOffset, yOffset, rotation, zIndex }
@@ -503,21 +518,52 @@ test("a player can reload and resume the same server-side board", async (t) => {
   )), boardLayout);
 });
 
-test("watch route remains directly accessible and missing rooms return the requested message", async (t) => {
+test("watch and OBS routes require the server-generated watch key", async (t) => {
   const game = createApplication();
   const address = await game.start();
   const url = `http://127.0.0.1:${address.port}`;
   t.after(() => game.close());
 
-  const response = await fetch(`${url}/watch/4821?obs=1`);
-  assert.equal(response.status, 200);
-  assert.match(await response.text(), /OBS用表示/);
+  const watchResponse = await fetch(`${url}/watch/4821?key=invalid`);
+  const obsResponse = await fetch(`${url}/obs/4821?key=invalid`);
+  assert.equal(watchResponse.status, 200);
+  assert.equal(obsResponse.status, 200);
+  assert.match(await watchResponse.text(), /観戦専用画面/);
 
   const watcher = await connect(url);
   t.after(() => watcher.close());
   const unavailablePromise = once(watcher, "watchUnavailable");
   watcher.emit("joinWatch", { roomId: "4821" });
-  assert.equal((await unavailablePromise).message, "ルームが見つかりません");
+  assert.equal((await unavailablePromise).message, "観戦URLが無効です");
+});
+
+test("watch keys are random, private, and invalid keys reveal no game state", async (t) => {
+  const game = createApplication();
+  const address = await game.start();
+  const url = `http://127.0.0.1:${address.port}`;
+  t.after(() => game.close());
+  const firstHost = await connect(url);
+  const secondHost = await connect(url);
+  const watcher = await connect(url);
+  t.after(() => { firstHost.close(); secondHost.close(); watcher.close(); });
+
+  const firstCreated = once(firstHost, "roomCreated");
+  firstHost.emit("createRoom", { name: "A" });
+  const firstState = await firstCreated;
+  const secondCreated = once(secondHost, "roomCreated");
+  secondHost.emit("createRoom", { name: "B" });
+  const secondState = await secondCreated;
+  const firstRoom = game.rooms.get(firstState.roomId);
+  const secondRoom = game.rooms.get(secondState.roomId);
+
+  assert.match(firstRoom.watchKey, /^[A-Za-z0-9_-]{43}$/);
+  assert.notEqual(firstRoom.watchKey, secondRoom.watchKey);
+  assert.equal(firstState.watchKey, undefined, "the key is not included in public game state");
+
+  const invalid = once(watcher, "watchUnavailable");
+  watcher.emit("joinWatch", { roomId: firstState.roomId, key: secondRoom.watchKey });
+  assert.equal((await invalid).message, "観戦URLが無効です");
+  assert.equal(watcher.listeners("watchJoined").length, 0);
 });
 
 test("all four supplied chopa images are served with the expected dimensions", async (t) => {

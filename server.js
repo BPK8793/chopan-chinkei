@@ -147,6 +147,16 @@ function generateRoomId(rooms, random = Math.random) {
   throw new Error("ルーム番号を発行できませんでした");
 }
 
+function generateWatchKey() {
+  return crypto.randomBytes(32).toString("base64url");
+}
+
+function watchKeyMatches(room, suppliedKey) {
+  const expected = Buffer.from(room.watchKey);
+  const supplied = Buffer.from(String(suppliedKey || ""));
+  return expected.length === supplied.length && crypto.timingSafeEqual(expected, supplied);
+}
+
 function createApplication(options = {}) {
   const app = express();
   const server = http.createServer(app);
@@ -161,7 +171,7 @@ function createApplication(options = {}) {
   const disconnectGraceMs = options.disconnectGraceMs ?? ROOM_DISCONNECT_GRACE_MS;
   const pendingDisconnects = new Map();
 
-  app.get("/watch/:roomId", (_req, res) => {
+  app.get(["/watch/:roomId", "/obs/:roomId"], (_req, res) => {
     res.sendFile(path.join(__dirname, "public", "watch.html"));
   });
   app.use(express.static(path.join(__dirname, "public")));
@@ -239,6 +249,10 @@ function createApplication(options = {}) {
 
   function broadcast(room, event = "roomUpdated") {
     io.to(room.id).to(`watch:${room.id}`).emit(event, publicState(room));
+    io.to(room.hostSocketId).emit("hostWatchAccess", {
+      roomId: room.id,
+      watchKey: room.watchKey
+    });
   }
 
   function findMembership(socket) {
@@ -478,12 +492,9 @@ function createApplication(options = {}) {
         return socket.emit("watchUnavailable", { message: "プレイヤー接続からは観戦モードへ移れません" });
       }
       const roomId = String(payload.roomId || "").trim();
-      if (!/^\d{4}$/.test(roomId)) {
-        return socket.emit("watchUnavailable", { message: "ルーム番号が正しくありません" });
-      }
       const room = rooms.get(roomId);
-      if (!room) {
-        return socket.emit("watchUnavailable", { message: "ルームが見つかりません" });
+      if (!/^\d{4}$/.test(roomId) || !room || !watchKeyMatches(room, payload.key)) {
+        return socket.emit("watchUnavailable", { message: "観戦URLが無効です" });
       }
       if (socket.data.watchRoomId) socket.leave(`watch:${socket.data.watchRoomId}`);
       socket.data.isWatcher = true;
@@ -500,6 +511,7 @@ function createApplication(options = {}) {
       const id = generateRoomId(rooms, random);
       const room = {
         id,
+        watchKey: generateWatchKey(),
         hostSocketId: socket.id,
         players: [{
           id: socket.id,

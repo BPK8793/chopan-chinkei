@@ -83,6 +83,10 @@ p { line-height: 1.75; }
 .watch-action { padding-bottom: 0; }
 .watch-action .entry-number { background: #8b75bc; }
 .watch-button { color: white; background: linear-gradient(135deg, #a791d2, #8069b4); box-shadow: 0 8px 20px rgba(128,105,180,.24); }
+.host-watch-controls { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin: 10px 0; }
+.host-watch-controls.hidden { display: none; }
+.host-watch-controls span { margin-right: auto; font-weight: 900; color: var(--muted); }
+.host-watch-controls .button { width: auto; min-height: 40px; margin: 0; padding: 0 16px; }
 .field-error { margin: 8px 0 0 !important; color: #b33f5b !important; font-weight: 800; text-align: center; }
 .sr-only { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 label { margin: 0 0 8px; font-weight: 800; font-size: 14px; }
@@ -465,6 +469,16 @@ input:focus { border-color: var(--pink); box-shadow: 0 0 0 4px #fbe1e8; }
 .watch-progress { margin-top: 8px; }
 .watch-status { width: min(680px, 100%); margin: 15vh auto 0; padding: 20px; border-radius: 18px; color: #6e625f; background: rgba(255,255,255,.94); box-shadow: var(--shadow); text-align: center; font-weight: 900; }
 .watch-status.error { color: #9b3850; background: #ffe8ed; }
+.watch-invalid .watch-sound-settings,
+.watch-invalid .watch-header,
+.watch-invalid .watch-progress,
+.watch-invalid .watch-players,
+.watch-invalid #watchOrderGame,
+.watch-invalid .effect-message,
+.watch-invalid .joker-chance-burst,
+.watch-invalid .reveal-timer,
+.watch-invalid .watch-card-grid,
+.watch-invalid .watch-result { display: none !important; }
 .watch-card-grid { width: min(100%, 1072px); pointer-events: none; user-select: none; }
 .watch-result { position: fixed; z-index: 45; inset: auto 24px 24px auto; width: min(370px, calc(100% - 48px)); padding: 22px; background: rgba(255,254,253,.96); }
 .watch-result h2 { margin: 0; }
