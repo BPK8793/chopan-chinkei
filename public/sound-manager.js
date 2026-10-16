@@ -107,9 +107,9 @@
     function speak(name) {
       if (!settings.speech || !unlocked || !name || !("speechSynthesis" in window)) return;
       try {
-        const utterance = new SpeechSynthesisUtterance(`${name}さんの番だよ`);
+        const utterance = new SpeechSynthesisUtterance(`${name}さんのばんだよ`);
         utterance.lang = "ja-JP";
-        utterance.rate = 1.05;
+        utterance.rate = 1.3125;
         utterance.pitch = 1.08;
         const japaneseVoice = window.speechSynthesis.getVoices().find((voice) => voice.lang?.toLowerCase().startsWith("ja"));
         if (japaneseVoice) utterance.voice = japaneseVoice;
