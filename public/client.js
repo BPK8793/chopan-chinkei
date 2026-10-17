@@ -3,6 +3,8 @@
 const socket = io();
 let state = null;
 let toastTimer = null;
+let effectMessageTimer = null;
+let dismissedEffectMessage = null;
 let revealInterval = null;
 let orderInterval = null;
 let hostWatchAccess = null;
@@ -12,6 +14,7 @@ const screens = [$("homeScreen"), $("roomScreen"), $("gameScreen")];
 const soundController = window.ChopanAudio?.createSoundController({ mode: "player" });
 const RESUME_ROOM_KEY = "chopan-resume-room";
 const RESUME_TOKEN_KEY = "chopan-resume-token";
+const MATCH_MESSAGE_MS = 1200;
 
 function saveResumeCredentials(nextState) {
   if (!nextState?.resumeToken) return;
@@ -115,7 +118,7 @@ function renderLobby() {
   renderHostWatchControls();
 }
 
-function renderGame() {
+function renderGame(eventName = "roomUpdated") {
   clearInterval(orderInterval);
   orderInterval = null;
   showScreen($("gameScreen"));
@@ -155,10 +158,25 @@ function renderGame() {
     ChopanCardView.updateCard(button, card, index, canFlip);
   });
 
-  if (state.message && !state.revealAll) {
+  if (eventName === "pairMatched") dismissedEffectMessage = null;
+  if (state.message && state.message !== dismissedEffectMessage && !state.revealAll) {
     $("effectMessage").textContent = state.message;
     $("effectMessage").classList.remove("hidden");
+    if (eventName === "pairMatched") {
+      const message = state.message;
+      clearTimeout(effectMessageTimer);
+      effectMessageTimer = setTimeout(() => {
+        dismissedEffectMessage = message;
+        $("effectMessage").classList.add("hidden");
+        effectMessageTimer = null;
+      }, MATCH_MESSAGE_MS);
+    }
   } else {
+    if (!state.message || state.revealAll) {
+      clearTimeout(effectMessageTimer);
+      effectMessageTimer = null;
+      dismissedEffectMessage = null;
+    }
     $("effectMessage").classList.add("hidden");
   }
   $("jokerChanceBurst").classList.toggle("hidden", !state.revealAll);
@@ -296,7 +314,7 @@ function applyState(next, eventName = "roomUpdated") {
     renderOrderGame();
   } else if (state.status === "playing") {
     $("resultModal").classList.add("hidden");
-    renderGame();
+    renderGame(eventName);
   } else if (state.status === "finished") {
     renderResults();
   }

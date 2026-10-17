@@ -180,6 +180,7 @@ function runBrowserScript(filename, socketId, location = { pathname: "/", search
   const { document, elements } = createDom();
   const socket = new FakeSocket(socketId);
   const clipboardWrites = [];
+  const timeouts = [];
   const context = {
     document,
     io: () => socket,
@@ -190,9 +191,13 @@ function runBrowserScript(filename, socketId, location = { pathname: "/", search
     ChopanCardView: { createCard: () => new FakeElement(), updateCard: () => {} },
     URLSearchParams,
     clearInterval: () => {},
-    clearTimeout: () => {},
+    clearTimeout: (timer) => { if (timer) timer.cancelled = true; },
     setInterval: () => 1,
-    setTimeout: () => 1
+    setTimeout: (callback, delay) => {
+      const timer = { callback, delay, cancelled: false };
+      timeouts.push(timer);
+      return timer;
+    }
   };
   context.window.location.pathname = location.pathname;
   context.window.location.search = location.search;
@@ -201,8 +206,37 @@ function runBrowserScript(filename, socketId, location = { pathname: "/", search
     context,
     { filename }
   );
-  return { socket, elements, clipboardWrites };
+  return { socket, elements, clipboardWrites, timeouts };
 }
+
+test("pair match messages disappear automatically without blocking the cards", () => {
+  const matchedState = baseState({
+    status: "playing",
+    message: "ペア成立！ +1"
+  });
+  const playerUi = runBrowserScript("client.js", "host");
+  playerUi.socket.receive("pairMatched", matchedState);
+  assert.equal(playerUi.elements.get("effectMessage").classList.contains("hidden"), false);
+  const playerTimer = playerUi.timeouts.find((timer) => timer.delay === 1200 && !timer.cancelled);
+  assert.ok(playerTimer);
+  playerTimer.callback();
+  assert.equal(playerUi.elements.get("effectMessage").classList.contains("hidden"), true);
+  playerUi.socket.receive("roomUpdated", matchedState);
+  assert.equal(playerUi.elements.get("effectMessage").classList.contains("hidden"), true);
+
+  const watcherUi = runBrowserScript("watch.js", "watcher", { pathname: "/watch/1234", search: "?key=secret" });
+  watcherUi.socket.receive("pairMatched", matchedState);
+  assert.equal(watcherUi.elements.get("watchEffect").classList.contains("hidden"), false);
+  const watcherTimer = watcherUi.timeouts.find((timer) => timer.delay === 1200 && !timer.cancelled);
+  assert.ok(watcherTimer);
+  watcherTimer.callback();
+  assert.equal(watcherUi.elements.get("watchEffect").classList.contains("hidden"), true);
+  watcherUi.socket.receive("roomUpdated", matchedState);
+  assert.equal(watcherUi.elements.get("watchEffect").classList.contains("hidden"), true);
+
+  const styles = fs.readFileSync(path.join(__dirname, "..", "public", "style.css"), "utf8");
+  assert.match(styles, /\.effect-message\s*{[^}]*pointer-events:\s*none/s);
+});
 
 test("start button is shown only to the waiting host and disappears on game start", () => {
   const { socket, elements } = runBrowserScript("client.js", "host");

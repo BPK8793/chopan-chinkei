@@ -15,6 +15,9 @@ const watchSoundController = window.ChopanAudio?.createSoundController({
 });
 let watchState = null;
 let watchRevealInterval = null;
+let watchEffectTimer = null;
+let dismissedWatchEffectMessage = null;
+const MATCH_MESSAGE_MS = 1200;
 
 const watchElement = (id) => document.getElementById(id);
 
@@ -156,10 +159,25 @@ function renderWatch(nextState, eventName = "roomUpdated") {
   }
 
   const effect = watchElement("watchEffect");
-  if (watchState.message && watchState.status !== "finished" && !watchState.revealAll) {
+  if (eventName === "pairMatched") dismissedWatchEffectMessage = null;
+  if (watchState.message && watchState.message !== dismissedWatchEffectMessage && watchState.status !== "finished" && !watchState.revealAll) {
     effect.textContent = watchState.message;
     effect.classList.remove("hidden");
+    if (eventName === "pairMatched") {
+      const message = watchState.message;
+      clearTimeout(watchEffectTimer);
+      watchEffectTimer = setTimeout(() => {
+        dismissedWatchEffectMessage = message;
+        effect.classList.add("hidden");
+        watchEffectTimer = null;
+      }, MATCH_MESSAGE_MS);
+    }
   } else {
+    if (!watchState.message || watchState.revealAll || watchState.status === "finished") {
+      clearTimeout(watchEffectTimer);
+      watchEffectTimer = null;
+      dismissedWatchEffectMessage = null;
+    }
     effect.classList.add("hidden");
   }
   watchElement("watchJokerChanceBurst").classList.toggle("hidden", !watchState.revealAll);
