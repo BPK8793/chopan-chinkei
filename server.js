@@ -10,7 +10,7 @@ const MAX_PLAYERS = 4;
 const MIN_PLAYERS = 2;
 const CARD_DISPLAY_TIMINGS = Object.freeze({
   mismatchMs: 2200,
-  jokerRevealMs: 6000
+  jokerRevealMs: 8000
 });
 const ORDER_GAME_TIMINGS = Object.freeze({
   choiceMs: 10_000,

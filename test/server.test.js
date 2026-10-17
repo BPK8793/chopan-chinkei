@@ -40,7 +40,7 @@ test("deck has 16 normal pairs and one joker pair", () => {
 
 test("card display timings are centralized at the requested durations", () => {
   assert.equal(CARD_DISPLAY_TIMINGS.mismatchMs, 2200);
-  assert.equal(CARD_DISPLAY_TIMINGS.jokerRevealMs, 6000);
+  assert.equal(CARD_DISPLAY_TIMINGS.jokerRevealMs, 8000);
   assert.equal(Object.isFrozen(CARD_DISPLAY_TIMINGS), true);
 });
 
