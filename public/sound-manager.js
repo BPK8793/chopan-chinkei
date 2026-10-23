@@ -156,7 +156,7 @@
       if (mode === "player") {
         const becameMyTurn = current.id === selfId && previousState?.currentPlayerId !== selfId;
         const roundStartedForMe = eventName === "gameStarted" && current.id === selfId && previousState?.status !== "playing";
-        if ((eventName === "turnChanged" && becameMyTurn) || roundStartedForMe) speak(`${current.name}さんのばんだよ`);
+        if ((eventName === "turnChanged" && becameMyTurn) || roundStartedForMe) speak(`${current.name}さんの番です`);
         return;
       }
 

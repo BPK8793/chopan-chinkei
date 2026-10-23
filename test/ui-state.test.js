@@ -529,7 +529,7 @@ test("turn speech runs once when an opponent hands the turn to this player", () 
   controller.handleGameEvent("roomUpdated", myTurn, myTurn, { selfId: "host" });
   controller.handleGameEvent("pairMatched", myTurn, myTurn, { selfId: "host" });
   assert.equal(spoken.length, 1);
-  assert.equal(spoken[0].text, "ホストさんのばんだよ");
+  assert.equal(spoken[0].text, "ホストさんの番です");
   assert.equal(spoken[0].lang, "ja-JP");
   assert.equal(spoken[0].voice.lang, "ja-JP");
   assert.equal(spoken[0].rate, 1.3125);
