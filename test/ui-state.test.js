@@ -548,6 +548,20 @@ test("turn speech runs once when an opponent hands the turn to this player", () 
   assert.equal(spoken[0].rate, 1.3125);
 });
 
+test("all players hear the current player's name, including the opening turn", () => {
+  for (const selfId of ["host", "guest"]) {
+    const { controller, documentListeners, spoken } = runSoundManager();
+    documentListeners.get("pointerdown")();
+    const hostTurn = baseState({ status: "playing", currentPlayerId: "host" });
+    const guestTurn = baseState({ status: "playing", currentPlayerId: "guest" });
+    controller.handleGameEvent("gameStarted", hostTurn, baseState({ status: "ordering" }), { selfId });
+    controller.handleGameEvent("turnChanged", guestTurn, hostTurn, { selfId });
+    controller.handleGameEvent("turnChanged", guestTurn, guestTurn, { selfId });
+    controller.handleGameEvent("pairMatched", guestTurn, guestTurn, { selfId });
+    assert.deepEqual(spoken.map((utterance) => utterance.text), ["ホストさんの番です", "ゲストさんの番です"]);
+  }
+});
+
 test("joker chance uses the dedicated mp3 without synthesized speech", () => {
   const { controller, documentListeners, played, spoken } = runSoundManager();
   documentListeners.get("pointerdown")();
