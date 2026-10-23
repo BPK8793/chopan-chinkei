@@ -427,7 +427,7 @@ input:focus { border-color: var(--pink); box-shadow: 0 0 0 4px #fbe1e8; }
   .game-progress > span:last-child { width: 100%; text-align: center; }
   .players-bar { margin: 9px 0; gap: 5px; }
   .score-chip { padding: 5px 8px; font-size: 10px; }
-  .card-grid { padding: 17px; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; }
+  .card-grid { padding: 17px 7px; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 7px; }
   .memory-card { transform: translate(var(--card-x-mobile, 0), var(--card-y-mobile, 0)) rotate(var(--card-rotation-mobile, 0)); }
   .memory-card:not(:disabled):hover { transform: translate(var(--card-x-mobile, 0), var(--card-y-mobile, 0)) rotate(var(--card-rotation-mobile, 0)); }
   .memory-card { border-radius: 11px; }
@@ -725,5 +725,58 @@ html.obs-page, html.obs-page body { width: 100%; height: 100%; overflow: hidden;
   body.game-active .card-grid,
   .watch-body:not(.obs-mode) .watch-card-grid {
     max-height: none;
+  }
+}
+
+/* スマホ横向きでは操作部の下に残る高さに34枚を収める。 */
+@media (orientation: landscape) and (max-height: 560px) and (pointer: coarse) {
+  body.game-active {
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  body.game-active .app-shell {
+    height: 100dvh;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  body.game-active .brand,
+  body.game-active #gameScreen > :not(.card-grid) {
+    flex-shrink: 0;
+  }
+
+  body.game-active #gameScreen {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .card-grid,
+  body.game-active .card-grid {
+    width: min(100%, 800px);
+    min-height: 0;
+    padding: 8px;
+    grid-template-columns: repeat(9, minmax(0, 1fr));
+    grid-template-rows: repeat(4, minmax(0, 1fr));
+    gap: 5px;
+    flex: 1 1 0;
+    align-content: stretch;
+    justify-items: center;
+  }
+
+  .card-grid .memory-card {
+    width: auto;
+    max-width: 100%;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .card-grid .memory-card,
+  .card-grid .memory-card:not(:disabled):hover {
+    transform: translate(var(--card-x-mobile, 0), var(--card-y-mobile, 0)) rotate(var(--card-rotation-mobile, 0));
   }
 }
