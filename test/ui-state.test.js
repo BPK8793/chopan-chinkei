@@ -519,6 +519,19 @@ test("sound events use the replaceable mp3 paths only after user interaction", (
   ]);
 });
 
+test("a tap primes Safari speech once before an asynchronous turn announcement", () => {
+  const { controller, documentListeners, spoken } = runSoundManager();
+  documentListeners.get("click")();
+  documentListeners.get("click")();
+  assert.equal(spoken.length, 1);
+  assert.equal(spoken[0].volume, 0);
+  const opponentTurn = baseState({ status: "playing", currentPlayerId: "guest" });
+  const myTurn = baseState({ status: "playing", currentPlayerId: "host" });
+  controller.handleGameEvent("turnChanged", myTurn, opponentTurn, { selfId: "host" });
+  assert.equal(spoken[1].text, "ホストさんの番です");
+  assert.equal(spoken[1].volume, controller.settings.volume);
+});
+
 test("turn speech runs once when an opponent hands the turn to this player", () => {
   const { controller, documentListeners, spoken } = runSoundManager();
   documentListeners.get("pointerdown")();

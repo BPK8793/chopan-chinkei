@@ -34,6 +34,7 @@
     const audioFiles = {};
     const unavailableFiles = new Set();
     let unlocked = false;
+    let speechPrimed = false;
     let audioContext = null;
     let lastCountdownId = null;
     let lastCountdownSecond = null;
@@ -68,6 +69,23 @@
 
     document.addEventListener?.("pointerdown", unlock, { once: true, passive: true });
     document.addEventListener?.("keydown", unlock, { once: true });
+
+    function primeSpeech() {
+      unlock();
+      if (speechPrimed || !settings.speech || !("speechSynthesis" in window)) return;
+      try {
+        // iOS Safariでは最初の読み上げをタップのハンドラ内で開始する必要がある。
+        const utterance = new SpeechSynthesisUtterance("準備完了");
+        utterance.lang = "ja-JP";
+        utterance.volume = 0;
+        window.speechSynthesis.speak(utterance);
+        speechPrimed = true;
+        utterance.onerror = () => { speechPrimed = false; };
+      } catch { speechPrimed = false; }
+    }
+
+    document.addEventListener?.("click", primeSpeech);
+    document.addEventListener?.("keyup", primeSpeech);
 
     function synthesize(eventName) {
       const context = ensureContext();
@@ -179,6 +197,7 @@
         speechInput.checked = settings.speech;
         speechInput.addEventListener("change", () => {
           settings.speech = speechInput.checked;
+          if (settings.speech) primeSpeech();
           if (!settings.speech) window.speechSynthesis?.cancel?.();
           save();
         });
