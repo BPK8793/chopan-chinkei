@@ -75,12 +75,15 @@
       if (speechPrimed || !settings.speech || !("speechSynthesis" in window)) return;
       try {
         // iOS Safariでは最初の読み上げをタップのハンドラ内で開始する必要がある。
-        const utterance = new SpeechSynthesisUtterance("準備完了");
+        const utterance = new SpeechSynthesisUtterance("");
         utterance.lang = "ja-JP";
         utterance.volume = 0;
-        window.speechSynthesis.speak(utterance);
+        utterance.onerror = (event) => {
+          // ターン通知のcancel()による中断では、次のタップで初期化し直さない。
+          if (event.error !== "canceled" && event.error !== "interrupted") speechPrimed = false;
+        };
         speechPrimed = true;
-        utterance.onerror = () => { speechPrimed = false; };
+        window.speechSynthesis.speak(utterance);
       } catch { speechPrimed = false; }
     }
 
