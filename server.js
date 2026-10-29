@@ -5,6 +5,7 @@ const http = require("http");
 const crypto = require("crypto");
 const express = require("express");
 const { Server } = require("socket.io");
+const { createVoiceIceProvider } = require("./voice-ice");
 
 const MAX_PLAYERS = 4;
 const MIN_PLAYERS = 2;
@@ -162,6 +163,7 @@ function createApplication(options = {}) {
   const server = http.createServer(app);
   const io = new Server(server, { cors: { origin: false } });
   const rooms = new Map();
+  const getVoiceIce = createVoiceIceProvider(options.voiceIceOptions);
   const random = options.random || Math.random;
   const failDelay = options.failDelay ?? CARD_DISPLAY_TIMINGS.mismatchMs;
   const jokerDelay = options.jokerDelay ?? CARD_DISPLAY_TIMINGS.jokerRevealMs;
@@ -457,6 +459,7 @@ function createApplication(options = {}) {
   }
 
   function removeOrDisconnect(socket, explicit = false) {
+    leaveVoice(socket);
     const membership = findMembership(socket);
     if (!membership) return;
     const { room, playerIndex } = membership;
@@ -496,7 +499,69 @@ function createApplication(options = {}) {
     broadcast(room);
   }
 
+  function voicePeers(room) {
+    return room.players.filter((player) => player.connected && io.sockets.sockets.get(player.id)?.data.voiceRoom === room.id)
+      .map((player) => ({ id: player.id, name: player.name, muted: Boolean(io.sockets.sockets.get(player.id)?.data.voiceMuted) }));
+  }
+
+  function leaveVoice(socket) {
+    socket.data.voiceRequestId = (socket.data.voiceRequestId || 0) + 1;
+    const room = rooms.get(socket.data.voiceRoom);
+    socket.data.voiceRoom = null;
+    if (room) io.to(room.id).emit("voicePeers", voicePeers(room));
+  }
+
   io.on("connection", (socket) => {
+    socket.on("voiceJoin", async (_payload, ack) => {
+      if (typeof ack !== "function") return;
+      const membership = findMembership(socket);
+      if (!membership || socket.data.isWatcher || !membership.room.players[membership.playerIndex].connected) {
+        return ack({ error: "ルームに参加してください" });
+      }
+      const { room } = membership;
+      if (socket.data.voiceJoining) return ack({ error: "通話への参加処理中です" });
+      if (socket.data.voiceRoom) return ack({ error: "すでに通話に参加しています" });
+      const requestId = (socket.data.voiceRequestId || 0) + 1;
+      socket.data.voiceRequestId = requestId;
+      socket.data.voiceJoining = true;
+      let configuration;
+      try {
+        configuration = await getVoiceIce(room.players[membership.playerIndex]);
+      } catch (error) {
+        return ack({ error: error.message });
+      } finally {
+        socket.data.voiceJoining = false;
+      }
+      if (!socket.connected || socket.data.voiceRequestId !== requestId || findMembership(socket)?.room !== room) {
+        return ack({ error: "通話への参加をキャンセルしました" });
+      }
+      socket.data.voiceRoom = room.id;
+      socket.data.voiceMuted = false;
+      ack({ peers: voicePeers(room).filter((peer) => peer.id !== socket.id), ...configuration });
+      io.to(room.id).emit("voicePeers", voicePeers(room));
+    });
+    socket.on("voiceLeave", () => leaveVoice(socket));
+    socket.on("voiceMute", (payload) => {
+      const room = rooms.get(socket.data.voiceRoom);
+      if (!room || typeof payload?.muted !== "boolean") return;
+      socket.data.voiceMuted = payload.muted;
+      io.to(room.id).emit("voicePeers", voicePeers(room));
+    });
+    socket.on("voiceSignal", (payload) => {
+      const room = rooms.get(socket.data.voiceRoom);
+      const target = io.sockets.sockets.get(payload?.to);
+      if (!room || !target || target === socket || target.data.voiceRoom !== room.id) return;
+      if (!voicePeers(room).some((peer) => peer.id === socket.id) || !voicePeers(room).some((peer) => peer.id === target.id)) return;
+      const signal = payload?.signal;
+      if (!signal || !["offer", "answer", "candidate"].includes(signal.type) || JSON.stringify(signal).length > 24000) return;
+      const now = Date.now();
+      if (!socket.data.voiceWindow || now - socket.data.voiceWindow > 10000) {
+        socket.data.voiceWindow = now;
+        socket.data.voiceSignals = 0;
+      }
+      if (++socket.data.voiceSignals > 100) return;
+      target.emit("voiceSignal", { from: socket.id, signal });
+    });
     socket.on("joinWatch", (payload = {}) => {
       if (findMembership(socket)) {
         return socket.emit("watchUnavailable", { message: "プレイヤー接続からは観戦モードへ移れません" });
@@ -593,6 +658,11 @@ function createApplication(options = {}) {
       }
 
       const previousSocketId = player.id;
+      const previousSocket = io.sockets.sockets.get(previousSocketId);
+      if (previousSocket) {
+        leaveVoice(previousSocket);
+        previousSocket.emit("voiceEnded");
+      }
       cancelDisconnectCleanup(player);
       if (room.hostSocketId === previousSocketId) room.hostSocketId = socket.id;
       player.id = socket.id;

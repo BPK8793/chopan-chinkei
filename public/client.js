@@ -12,6 +12,7 @@ let hostWatchAccess = null;
 const $ = (id) => document.getElementById(id);
 const screens = [$("homeScreen"), $("roomScreen"), $("gameScreen")];
 const soundController = window.ChopanAudio?.createSoundController({ mode: "player" });
+const voiceController = window.ChopanVoice?.createController(socket);
 const RESUME_ROOM_KEY = "chopan-resume-room";
 const RESUME_TOKEN_KEY = "chopan-resume-token";
 const MATCH_MESSAGE_MS = 1200;
@@ -28,6 +29,7 @@ function clearResumeCredentials() {
 }
 
 function showScreen(screen) {
+  if (screen === $("homeScreen")) voiceController?.setRoom(null);
   screens.forEach((item) => item.classList.toggle("hidden", item !== screen));
   document.body.classList.toggle("game-active", screen === $("gameScreen"));
 }
@@ -302,6 +304,7 @@ function applyState(next, eventName = "roomUpdated") {
   soundController?.handleGameEvent(eventName, next, previousState, { selfId: socket.id });
   if (eventName === "gameStarted") $("cardGrid").replaceChildren();
   state = next;
+  voiceController?.setRoom(next.roomId);
   if (state.status !== "waiting") {
     $("startButton").classList.add("hidden");
     $("startButton").disabled = true;
@@ -389,6 +392,7 @@ $("copyGameObsUrlButton").addEventListener("click", () => copyWatchUrl("obs"));
 $("rematchButton").addEventListener("click", () => socket.emit("requestRematch"));
 $("lobbyButton").addEventListener("click", () => socket.emit("returnToLobby"));
 $("topButton").addEventListener("click", () => {
+  voiceController?.setRoom(null);
   socket.emit("leaveRoom");
   clearResumeCredentials();
   window.location.reload();

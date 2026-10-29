@@ -6,6 +6,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "start:local": "node --env-file=.env server.js",
     "test": "node --test"
   },
   "engines": {

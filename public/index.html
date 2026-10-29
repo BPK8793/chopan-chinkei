@@ -28,6 +28,18 @@
       </div>
     </details>
 
+    <section id="voicePanel" class="voice-panel panel hidden" aria-label="ボイスチャット">
+      <div class="voice-controls">
+        <strong>ボイスチャット</strong>
+        <button id="voiceJoin" class="button secondary" type="button">通話に参加</button>
+        <button id="voiceMute" class="button secondary hidden" type="button" aria-pressed="false">マイクをオフ</button>
+        <button id="voiceLeave" class="text-button hidden" type="button">通話を退出</button>
+      </div>
+      <p id="voiceStatus" class="hint" role="status">参加ボタンを押すとマイクの許可を求めます</p>
+      <div id="voicePeers" class="voice-peers"></div>
+      <button id="voicePlay" class="text-button hidden" type="button">相手の音声を再生</button>
+      <div id="voiceAudio" hidden></div>
+    </section>
     <div id="connectionBanner" class="connection-banner hidden" role="status">サーバーに再接続しています…</div>
     <div id="toast" class="toast hidden" role="alert"></div>
 
@@ -164,6 +176,7 @@
   <script src="/socket.io/socket.io.js"></script>
   <script src="/card-view.js"></script>
   <script src="/sound-manager.js?v=20261023-silent-prime"></script>
+  <script src="/voice-chat.js?v=2-cloudflare"></script>
   <script src="/client.js?v=20261017-auto-hide-match"></script>
 </body>
 </html>

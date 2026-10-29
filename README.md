@@ -29,6 +29,38 @@ npm test
 
 無料枠では一定時間アクセスがないと休止し、最初のアクセスに時間がかかることがあります。サーバー再起動時には、メモリ上のルーム情報は消えます。
 
+## ボイスチャット（試作）
+
+ルーム参加後、画面上部の「通話に参加」を押してマイクを許可すると、同じルームで通話参加中のプレイヤーと話せます。最大4人、待機中・対戦中で利用できます。「マイクをオフ」でミュート、「通話を退出」でマイクと音声接続を停止します。ゲーム退出・通信切断時も停止し、再接続後は手動で再参加します。観戦・OBSには音声を送信しません。
+
+ローカルでは `http://localhost:3000` を2つのブラウザで開き、別名で同じルームに参加して試せます。同じPCで試す際はハウリングに注意し、イヤホンを使ってください。実際の聞こえ方は別端末での確認が必要です。
+
+マイク利用にはHTTPSまたはlocalhostが必要です。スマホからPCの `http://192.168.…:3000` にアクセスするだけでは通話できません。別端末での確認には、両端末からアクセスできるHTTPS環境を用意してください。
+
+### Cloudflareの音声中継を設定する
+
+1. [Cloudflare公式の手順](https://developers.cloudflare.com/realtime/turn/generate-credentials/)でRealtime TURNキーを作成します。TURN Key IDと、そのキーのAPI Tokenを控えてください。
+2. ローカルでは `.env.example` を `.env` にコピーし、次の2項目を入力します。`.env` はGitの管理対象外です。秘密キーをチャットや `public/` に貼らないでください。
+
+   ```dotenv
+   CLOUDFLARE_TURN_KEY_ID=作成したTURNキーのID
+   CLOUDFLARE_TURN_API_TOKEN=作成時に取得したAPIトークン
+   VOICE_RELAY_ONLY=false
+   ```
+
+3. Node.js 20.6以上で `npm run start:local` を実行します。このコマンドは `.env` を読み込みます。通常の `npm start` はOS・ホスティング側に設定された環境変数を使います。
+4. RenderではEnvironmentに同じ2項目を登録して再起動します。ゲームサイトやドメインをCloudflareへ移す必要はありません。
+
+WindowsでCloudflareへの接続が証明書エラーになる場合、対応するNode.jsでは `node --use-system-ca --env-file=.env server.js` でWindowsの信頼済み証明書を使用できます。証明書の検証は無効にしないでください。
+
+通話参加時にサーバーがCloudflareへ認証情報を要求し、プレイヤーごとに期限付きのTURNユーザー名とパスワードを取得します。長期利用のAPIトークンはブラウザや観戦者へ渡しません。発行済み認証情報はそのプレイヤー用に再利用し、APIの失敗時は通話を開始せず、再試行を案内します。
+
+通常は端末間の直接接続を試し、必要な場合にTURNで中継します。中継の動作確認では `.env` の `VOICE_RELAY_ONLY=true` にしてサーバーを再起動し、双方が通話に再参加してください。このモードで通話がつながれば、TURN経由で通信しています。別回線のPC・スマホから同じHTTPSのゲームURLへ参加し、双方向の音声・ミュート・退出を確認してください。確認後は `false` に戻します。Cloudflare TURN自体はゲーム画面をHTTPSで公開するサービスではありません。
+
+今回の認証情報の有効期限は発行から24時間です。期限直前に通話を終了して再参加を案内します。長時間通話中の自動更新は未実装です。料金・無料枠は[Cloudflare公式料金](https://developers.cloudflare.com/realtime/sfu/platform/pricing/)を確認してください。
+
+Cloudflareのキーが両方とも未設定なら、ローカル向けの直接接続になります。既存の `VOICE_ICE_SERVERS` による手動設定も利用できますが、Cloudflareのキーを設定した場合はそちらを優先します。
+
 ## 画像の追加
 
 画像なしでも文字とマークでプレイできます。画像ファイルの配置規則は [`public/images/README.md`](public/images/README.md) を参照してください。
