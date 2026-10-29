@@ -176,7 +176,8 @@
 
       const turnChanged = previousState?.currentPlayerId !== nextState.currentPlayerId;
       const roundStarted = eventName === "gameStarted" && previousState?.status !== "playing";
-      if ((eventName === "turnChanged" && turnChanged) || roundStarted) speak(`${current.name}さんの番です`);
+      // 「番」を「つがい」と誤読する音声があるため、読み上げでは読みを指定する。
+      if ((eventName === "turnChanged" && turnChanged) || roundStarted) speak(`${current.name}さんのばんです`);
     }
 
     function bindControls() {

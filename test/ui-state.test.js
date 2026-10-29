@@ -529,7 +529,7 @@ test("a tap primes Safari speech once before an asynchronous turn announcement",
   const opponentTurn = baseState({ status: "playing", currentPlayerId: "guest" });
   const myTurn = baseState({ status: "playing", currentPlayerId: "host" });
   controller.handleGameEvent("turnChanged", myTurn, opponentTurn, { selfId: "host" });
-  assert.equal(spoken[1].text, "ホストさんの番です");
+  assert.equal(spoken[1].text, "ホストさんのばんです");
   assert.equal(spoken[1].volume, controller.settings.volume);
   for (const error of ["canceled", "interrupted"]) {
     spoken[0].onerror({ error });
@@ -548,7 +548,7 @@ test("turn speech runs once when an opponent hands the turn to this player", () 
   controller.handleGameEvent("roomUpdated", myTurn, myTurn, { selfId: "host" });
   controller.handleGameEvent("pairMatched", myTurn, myTurn, { selfId: "host" });
   assert.equal(spoken.length, 1);
-  assert.equal(spoken[0].text, "ホストさんの番です");
+  assert.equal(spoken[0].text, "ホストさんのばんです");
   assert.equal(spoken[0].lang, "ja-JP");
   assert.equal(spoken[0].voice.lang, "ja-JP");
   assert.equal(spoken[0].rate, 1.3125);
@@ -564,7 +564,7 @@ test("all players hear the current player's name, including the opening turn", (
     controller.handleGameEvent("turnChanged", guestTurn, hostTurn, { selfId });
     controller.handleGameEvent("turnChanged", guestTurn, guestTurn, { selfId });
     controller.handleGameEvent("pairMatched", guestTurn, guestTurn, { selfId });
-    assert.deepEqual(spoken.map((utterance) => utterance.text), ["ホストさんの番です", "ゲストさんの番です"]);
+    assert.deepEqual(spoken.map((utterance) => utterance.text), ["ホストさんのばんです", "ゲストさんのばんです"]);
   }
 });
 
