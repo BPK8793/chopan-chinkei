@@ -512,6 +512,27 @@ function createApplication(options = {}) {
   }
 
   io.on("connection", (socket) => {
+    socket.on("chatSend", (payload, ack) => {
+      if (typeof ack !== "function") return;
+      const membership = findMembership(socket);
+      if (!membership || socket.data.isWatcher || !membership.room.players[membership.playerIndex].connected) {
+        return ack({ error: "ルームに参加してください" });
+      }
+      if (typeof payload?.text !== "string") return ack({ error: "メッセージを入力してください" });
+      const text = payload.text.replace(/[\u0000-\u001f\u007f]/g, " ").trim();
+      if (!text || text.length > 160) return ack({ error: "1〜160文字で入力してください" });
+      const now = Date.now();
+      if (socket.data.lastChatAt && now - socket.data.lastChatAt < 1000) {
+        return ack({ error: "少し待ってから送信してください" });
+      }
+      socket.data.lastChatAt = now;
+      const { room, playerIndex } = membership;
+      const message = { roomId: room.id, name: room.players[playerIndex].name, text };
+      for (const player of room.players) {
+        if (player.connected) io.to(player.id).emit("chatMessage", message);
+      }
+      ack({ ok: true });
+    });
     socket.on("voiceJoin", async (_payload, ack) => {
       if (typeof ack !== "function") return;
       const membership = findMembership(socket);

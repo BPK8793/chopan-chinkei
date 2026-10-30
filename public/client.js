@@ -13,6 +13,7 @@ const $ = (id) => document.getElementById(id);
 const screens = [$("homeScreen"), $("roomScreen"), $("gameScreen")];
 const soundController = window.ChopanAudio?.createSoundController({ mode: "player" });
 const voiceController = window.ChopanVoice?.createController(socket);
+const chatController = window.ChopanChat?.createController(socket);
 const RESUME_ROOM_KEY = "chopan-resume-room";
 const RESUME_TOKEN_KEY = "chopan-resume-token";
 const MATCH_MESSAGE_MS = 1200;
@@ -29,7 +30,12 @@ function clearResumeCredentials() {
 }
 
 function showScreen(screen) {
-  if (screen === $("homeScreen")) voiceController?.setRoom(null);
+  if (screen === $("homeScreen")) {
+    voiceController?.setRoom(null);
+    chatController?.setRoom(null);
+    $("lobbyWatchControls").classList.add("hidden");
+    $("gameWatchControls").classList.add("hidden");
+  }
   screens.forEach((item) => item.classList.toggle("hidden", item !== screen));
   document.body.classList.toggle("game-active", screen === $("gameScreen"));
 }
@@ -53,8 +59,8 @@ function isHost() {
 
 function renderHostWatchControls() {
   const visible = Boolean(isHost() && hostWatchAccess?.roomId === state?.roomId && hostWatchAccess.watchKey);
-  $("lobbyWatchControls").classList.toggle("hidden", !visible);
-  $("gameWatchControls").classList.toggle("hidden", !visible);
+  $("lobbyWatchControls").classList.toggle("hidden", !visible || $("roomScreen").classList.contains("hidden"));
+  $("gameWatchControls").classList.toggle("hidden", !visible || $("gameScreen").classList.contains("hidden"));
 }
 
 function watchUrl(kind) {
@@ -305,6 +311,7 @@ function applyState(next, eventName = "roomUpdated") {
   if (eventName === "gameStarted") $("cardGrid").replaceChildren();
   state = next;
   voiceController?.setRoom(next.roomId);
+  chatController?.setRoom(next.roomId);
   if (state.status !== "waiting") {
     $("startButton").classList.add("hidden");
     $("startButton").disabled = true;

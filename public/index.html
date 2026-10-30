@@ -39,6 +39,20 @@
       <div id="voicePeers" class="voice-peers"></div>
       <button id="voicePlay" class="text-button hidden" type="button">相手の音声を再生</button>
       <div id="voiceAudio" hidden></div>
+      <details class="mic-help">
+        <summary>マイクで困ったら</summary>
+        <div class="mic-help-content">
+          <strong>許可済みでも、別のマイクが選ばれていることがあります</strong>
+          <p>Windowsで録音できても、ブラウザが「CABLE Output」などの仮想機器を選んでいると声が届きません。実際に使うUSBマイクやヘッドセットを選んでください。</p>
+          <ul>
+            <li>Chrome：設定 → プライバシーとセキュリティ → サイトの設定 → マイク。上部で使用するマイクを確認します。</li>
+            <li>Edge：設定内で「マイク」を検索し、サイトのマイク設定で使用する機器を確認します。</li>
+            <li>スマホ：ブラウザ・サイトのマイク利用を許可します。Bluetoothイヤホンが接続されている場合は、そのマイクも確認してください。</li>
+          </ul>
+          <p>変更後は「通話を退出」→「通話に参加」で接続し直します。Windowsの設定 → システム → サウンド → 入力の録音テストでも声を確認できます。</p>
+          <p>声が反響する場合はイヤホンを使い、「♪ 音設定」のターン読み上げをオフにしてください。</p>
+        </div>
+      </details>
     </section>
     <div id="connectionBanner" class="connection-banner hidden" role="status">サーバーに再接続しています…</div>
     <div id="toast" class="toast hidden" role="alert"></div>
@@ -92,11 +106,6 @@
         </div>
         <button id="leaveRoomButton" class="text-button">退出する</button>
       </div>
-      <div id="lobbyWatchControls" class="host-watch-controls panel compact hidden">
-        <span>配信・観戦用</span>
-        <button id="copyLobbyWatchUrlButton" class="button secondary" type="button">観戦URLをコピー</button>
-        <button id="copyLobbyObsUrlButton" class="button secondary" type="button">OBS用URLをコピー</button>
-      </div>
       <div class="lobby-grid">
         <div class="panel lobby-main">
           <h2>なかまたち</h2>
@@ -123,10 +132,6 @@
         </div>
         <button id="quitGameButton" class="game-quit-button" type="button">ゲームをやめる</button>
       </div>
-      <div id="gameWatchControls" class="host-watch-controls hidden">
-        <button id="copyGameWatchUrlButton" class="button secondary" type="button">観戦URLをコピー</button>
-        <button id="copyGameObsUrlButton" class="button secondary" type="button">OBS用URLをコピー</button>
-      </div>
       <section id="orderGame" class="order-game panel hidden" aria-live="polite">
         <p class="eyebrow">TURN ORDER</p>
         <h2 id="orderGameTitle">運命の1枚を選ぼう！</h2>
@@ -150,6 +155,26 @@
       <div id="revealTimer" class="reveal-timer hidden" aria-live="polite">全カード公開 <strong>6</strong></div>
       <div id="cardGrid" class="card-grid" aria-label="カード盤面"></div>
     </section>
+
+    <section id="roomChat" class="room-chat panel hidden" aria-label="ルームチャット">
+      <span class="chat-label">チャット</span>
+      <p id="chatLatest" class="chat-latest" role="status" aria-live="polite">音声が届かないときも、ここで連絡できます</p>
+      <form id="chatForm" class="chat-form">
+        <label class="sr-only" for="chatInput">メッセージ（160文字まで）</label>
+        <input id="chatInput" maxlength="160" placeholder="ひとこと送る" autocomplete="off">
+        <button id="chatSend" class="button secondary" type="submit">送信</button>
+      </form>
+    </section>
+    <div id="lobbyWatchControls" class="host-watch-controls panel compact hidden">
+      <span>配信・観戦用</span>
+      <button id="copyLobbyWatchUrlButton" class="button secondary" type="button">観戦URLをコピー</button>
+      <button id="copyLobbyObsUrlButton" class="button secondary" type="button">OBS用URLをコピー</button>
+    </div>
+    <div id="gameWatchControls" class="host-watch-controls panel compact hidden">
+      <span>配信・観戦用</span>
+      <button id="copyGameWatchUrlButton" class="button secondary" type="button">観戦URLをコピー</button>
+      <button id="copyGameObsUrlButton" class="button secondary" type="button">OBS用URLをコピー</button>
+    </div>
 
     <div id="quitGameModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="quitGameTitle">
       <div class="modal-card panel quit-game-card">
@@ -179,6 +204,7 @@
   <script src="/card-view.js"></script>
   <script src="/sound-manager.js?v=20261023-silent-prime"></script>
   <script src="/voice-chat.js?v=2-cloudflare"></script>
+  <script src="/room-chat.js?v=1"></script>
   <script src="/client.js?v=20261017-auto-hide-match"></script>
 </body>
 </html>
