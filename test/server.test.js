@@ -318,20 +318,25 @@ test("a mismatch hides both cards and advances the turn", async (t) => {
   const room = game.rooms.get(roomId);
   const first = 0;
   const second = room.cards.findIndex((card) => card.pairKey !== room.cards[first].pairKey);
+  const initialTop = Math.max(...room.cards.map((card) => card.zIndex));
   const firstFlip = once(host, "cardFlipped");
   host.emit("flipCard", { index: first });
-  await firstFlip;
+  const flipped = await firstFlip;
+  assert.ok(flipped.cards[first].zIndex > initialTop);
   const failedPromise = once(host, "pairFailed");
   host.emit("flipCard", { index: second });
   const failed = await failedPromise;
   assert.equal(failed.cards[first].visible, true);
   assert.equal(failed.cards[second].visible, true);
+  assert.ok(failed.cards[second].zIndex > flipped.cards[first].zIndex);
   assert.equal(failed.isProcessing, true);
 
   const changed = await once(host, "turnChanged");
   assert.equal(changed.currentPlayerId, guest.id);
   assert.equal(changed.cards[first].visible, false);
   assert.equal(changed.cards[first].name, undefined);
+  assert.equal(changed.cards[first].zIndex, flipped.cards[first].zIndex);
+  assert.equal(changed.cards[second].zIndex, failed.cards[second].zIndex);
 });
 
 test("joker pair awards two points, reveals remaining cards, then locks them again", async (t) => {

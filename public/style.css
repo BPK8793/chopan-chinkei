@@ -158,7 +158,7 @@ input:focus { border-color: var(--pink); box-shadow: 0 0 0 4px #fbe1e8; }
 .score-chip.disconnected { opacity: .48; }
 .score-chip b { color: var(--pink-dark); }
 
-.card-grid { width: min(100%, 1072px); margin: 0 auto; padding: 36px; display: grid; grid-template-columns: repeat(7, minmax(70px, 1fr)); gap: clamp(7px, 1vw, 13px); perspective: 1000px; }
+.card-grid { width: min(100%, 1072px); margin: 0 auto; padding: 36px; display: grid; grid-template-columns: repeat(7, minmax(70px, 1fr)); gap: clamp(7px, 1vw, 13px); perspective: 1000px; isolation: isolate; }
 .memory-card { position: relative; aspect-ratio: .75; min-width: 0; border: 0; padding: 0; border-radius: 15px; background: transparent; cursor: pointer; transform: translate(var(--card-x, 0), var(--card-y, 0)) rotate(var(--card-rotation, 0)); transition: transform .18s ease, opacity .35s; }
 .card-flipper { position: absolute; inset: 0; border-radius: inherit; transform-style: preserve-3d; transition: transform .42s cubic-bezier(.2,.7,.2,1); }
 .memory-card.flipped .card-flipper, .memory-card.matched .card-flipper { transform: rotateY(180deg); }

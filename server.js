@@ -733,6 +733,8 @@ function createApplication(options = {}) {
       if (!Number.isInteger(index) || index < 0 || index >= room.cards.length) return;
       if (room.cards[index].matched || room.selectedCards.includes(index)) return;
 
+      // Keep the last handled card on top, including after it turns face down.
+      room.cards[index].zIndex = Math.max(...room.cards.map((card) => card.zIndex || 1)) + 1;
       room.selectedCards.push(index);
       room.message = "";
       broadcast(room, "cardFlipped");
