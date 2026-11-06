@@ -79,6 +79,7 @@
             <h3 id="createActionTitle">ルームを作る</h3>
             <p>新しいルームを作って友だちを招待</p>
           </div>
+          <label class="presenter-option"><input id="presenterOnly" type="checkbox"> 配信・進行のみ（ゲーム・通話には参加しない）</label>
           <button id="createButton" class="button primary">ルームを作る</button>
         </section>
 
@@ -110,6 +111,8 @@
         <div class="panel lobby-main">
           <h2>なかまたち</h2>
           <p id="playerCount" class="muted">1 / 4人</p>
+          <p id="presenterInfo" class="hint hidden"></p>
+          <button id="hostParticipationButton" class="button secondary hidden" type="button"></button>
           <div id="lobbyPlayers" class="lobby-players"></div>
         </div>
         <div class="panel lobby-guide">
@@ -205,6 +208,6 @@
   <script src="/sound-manager.js?v=20261023-silent-prime"></script>
   <script src="/voice-chat.js?v=2-cloudflare"></script>
   <script src="/room-chat.js?v=1"></script>
-  <script src="/client.js?v=20261017-auto-hide-match"></script>
+  <script src="/client.js?v=20261106-presenter"></script>
 </body>
 </html>

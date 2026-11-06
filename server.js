@@ -221,6 +221,7 @@ function createApplication(options = {}) {
       roomId: room.id,
       status: room.status,
       hostId: room.hostSocketId,
+      presenter: room.presenter ? { id: room.presenter.id, name: room.presenter.name, connected: room.presenter.connected } : null,
       players: room.players.map(({ id, name, score, connected, rematch }) => ({
         id, name, score, connected, rematch
       })),
@@ -259,6 +260,7 @@ function createApplication(options = {}) {
 
   function findMembership(socket) {
     for (const room of rooms.values()) {
+      if (room.presenter?.id === socket.id) return { room, playerIndex: -1 };
       const playerIndex = room.players.findIndex((player) => player.id === socket.id);
       if (playerIndex !== -1) return { room, playerIndex };
     }
@@ -306,7 +308,8 @@ function createApplication(options = {}) {
   }
 
   function closeEmptyRoom(room) {
-    if (activePlayers(room).length > 0) return false;
+    if (activePlayers(room).length > 0 || room.presenter?.connected) return false;
+    if (room.presenter) cancelDisconnectCleanup(room.presenter);
     room.players.forEach(cancelDisconnectCleanup);
     io.to(`watch:${room.id}`).emit("watchUnavailable", { message: "このルームは終了しました" });
     rooms.delete(room.id);
@@ -352,7 +355,15 @@ function createApplication(options = {}) {
       const playerIndex = currentRoom.players.findIndex(
         (candidate) => candidate.resumeToken === player.resumeToken
       );
-      if (playerIndex === -1 || currentRoom.players[playerIndex].connected) return;
+      if (playerIndex === -1) {
+        if (currentRoom.presenter?.resumeToken !== player.resumeToken || currentRoom.presenter.connected) return;
+        currentRoom.presenter = null;
+        if (closeEmptyRoom(currentRoom)) return;
+        currentRoom.hostSocketId = activePlayers(currentRoom)[0]?.id || currentRoom.players[0]?.id;
+        broadcast(currentRoom);
+        return;
+      }
+      if (currentRoom.players[playerIndex].connected) return;
 
       if (closeEmptyRoom(currentRoom)) return;
       removePlayerRecord(currentRoom, playerIndex);
@@ -463,8 +474,21 @@ function createApplication(options = {}) {
     const membership = findMembership(socket);
     if (!membership) return;
     const { room, playerIndex } = membership;
-    const player = room.players[playerIndex];
+    const player = playerIndex === -1 ? room.presenter : room.players[playerIndex];
     socket.leave(room.id);
+    if (playerIndex === -1) {
+      if (explicit) {
+        cancelDisconnectCleanup(player);
+        room.presenter = null;
+        room.hostSocketId = activePlayers(room)[0]?.id || room.players[0]?.id;
+        if (closeEmptyRoom(room)) return;
+      } else {
+        player.connected = false;
+        scheduleDisconnectCleanup(room, player);
+      }
+      broadcast(room);
+      return;
+    }
 
     if (explicit) {
       cancelDisconnectCleanup(player);
@@ -479,7 +503,7 @@ function createApplication(options = {}) {
       if (!explicit) scheduleDisconnectCleanup(room, player);
     }
 
-    if (activePlayers(room).length === 0) {
+    if (activePlayers(room).length === 0 && !room.presenter?.connected) {
       if (!explicit) {
         broadcast(room);
         return;
@@ -515,7 +539,7 @@ function createApplication(options = {}) {
     socket.on("chatSend", (payload, ack) => {
       if (typeof ack !== "function") return;
       const membership = findMembership(socket);
-      if (!membership || socket.data.isWatcher || !membership.room.players[membership.playerIndex].connected) {
+      if (!membership || membership.playerIndex < 0 || socket.data.isWatcher || !membership.room.players[membership.playerIndex].connected) {
         return ack({ error: "ルームに参加してください" });
       }
       if (typeof payload?.text !== "string") return ack({ error: "メッセージを入力してください" });
@@ -536,7 +560,7 @@ function createApplication(options = {}) {
     socket.on("voiceJoin", async (_payload, ack) => {
       if (typeof ack !== "function") return;
       const membership = findMembership(socket);
-      if (!membership || socket.data.isWatcher || !membership.room.players[membership.playerIndex].connected) {
+      if (!membership || membership.playerIndex < 0 || socket.data.isWatcher || !membership.room.players[membership.playerIndex].connected) {
         return ack({ error: "ルームに参加してください" });
       }
       const { room } = membership;
@@ -553,7 +577,7 @@ function createApplication(options = {}) {
       } finally {
         socket.data.voiceJoining = false;
       }
-      if (!socket.connected || socket.data.voiceRequestId !== requestId || findMembership(socket)?.room !== room) {
+      if (!socket.connected || socket.data.voiceRequestId !== requestId || findMembership(socket)?.room !== room || findMembership(socket)?.playerIndex < 0) {
         return ack({ error: "通話への参加をキャンセルしました" });
       }
       socket.data.voiceRoom = room.id;
@@ -635,9 +659,12 @@ function createApplication(options = {}) {
         turnOrder: [],
         roundId: 0
       };
+      if (payload.presenterOnly === true) {
+        room.presenter = room.players.pop();
+      }
       rooms.set(id, room);
       socket.join(id);
-      socket.emit("roomCreated", { ...publicState(room), resumeToken: room.players[0].resumeToken });
+      socket.emit("roomCreated", { ...publicState(room), resumeToken: (room.presenter || room.players[0]).resumeToken });
       broadcast(room);
     });
 
@@ -651,7 +678,7 @@ function createApplication(options = {}) {
       if (!room) return emitError(socket, "ルームが存在しません");
       if (room.status !== "waiting") return emitError(socket, "このルームはゲーム開始済みです");
       if (room.players.length >= MAX_PLAYERS) return emitError(socket, "ルームは満員です");
-      if (room.players.some((player) => player.name === name)) {
+      if (room.presenter?.name === name || room.players.some((player) => player.name === name)) {
         return emitError(socket, "同じ名前のプレイヤーがいます");
       }
       const player = {
@@ -673,7 +700,7 @@ function createApplication(options = {}) {
       const roomId = String(payload.roomId || "").trim();
       const resumeToken = String(payload.resumeToken || "");
       const room = rooms.get(roomId);
-      const player = room?.players.find((candidate) => candidate.resumeToken === resumeToken);
+      const player = room?.presenter?.resumeToken === resumeToken ? room.presenter : room?.players.find((candidate) => candidate.resumeToken === resumeToken);
       if (!room || !player) {
         return socket.emit("resumeUnavailable", { message: "前回のルームには復帰できませんでした" });
       }
@@ -681,6 +708,7 @@ function createApplication(options = {}) {
       const previousSocketId = player.id;
       const previousSocket = io.sockets.sockets.get(previousSocketId);
       if (previousSocket) {
+        previousSocket.leave(room.id);
         leaveVoice(previousSocket);
         previousSocket.emit("voiceEnded");
       }
@@ -698,6 +726,23 @@ function createApplication(options = {}) {
       broadcast(room);
     });
 
+    socket.on("setHostParticipation", (payload = {}) => {
+      const membership = findMembership(socket);
+      if (!membership) return;
+      const { room, playerIndex } = membership;
+      if (room.hostSocketId !== socket.id || room.status !== "waiting") return;
+      if (typeof payload.presenterOnly !== "boolean") return;
+      if (payload.presenterOnly && playerIndex >= 0) {
+        leaveVoice(socket);
+        room.presenter = room.players.splice(playerIndex, 1)[0];
+      } else if (!payload.presenterOnly && playerIndex < 0) {
+        if (room.players.length >= MAX_PLAYERS) return emitError(socket, "ルームは満員です");
+        room.players.push(room.presenter);
+        room.presenter = null;
+      }
+      broadcast(room);
+    });
+
     socket.on("startGame", () => {
       const membership = findMembership(socket);
       if (!membership) return emitError(socket, "ルームに参加していません");
@@ -712,7 +757,7 @@ function createApplication(options = {}) {
       const membership = findMembership(socket);
       if (!membership) return emitError(socket, "ルームに参加していません");
       const { room, playerIndex } = membership;
-      if (room.status !== "orderSelection" || !room.players[playerIndex].connected) return;
+      if (playerIndex < 0 || room.status !== "orderSelection" || !room.players[playerIndex].connected) return;
       if (room.orderCards.some((card) => card.chosenBy === socket.id)) return;
       const card = room.orderCards.find((candidate) => candidate.id === String(payload.cardId || ""));
       if (!card || card.chosenBy) return emitError(socket, "そのカードはすでに選ばれています");
@@ -795,6 +840,11 @@ function createApplication(options = {}) {
       if (!membership) return;
       const { room, playerIndex } = membership;
       if (room.status !== "finished") return;
+      if (playerIndex < 0) {
+        if (activePlayers(room).length >= MIN_PLAYERS) startOrderSelection(room);
+        else emitError(socket, "2人以上で再戦できます");
+        return;
+      }
       room.players[playerIndex].rematch = true;
       const connected = activePlayers(room);
       if (connected.length >= MIN_PLAYERS && connected.every((player) => player.rematch)) startOrderSelection(room);

@@ -809,3 +809,25 @@ test("a missing character image leaves the text fallback visible", () => {
   assert.equal(fallback.children[0].textContent, "フォールバック");
   assert.equal(front.classList.contains("has-image"), false);
 });
+
+
+test("presenter UI shows progress controls while order cards stay read-only", () => {
+  const { socket, elements } = runBrowserScript("client.js", "host");
+  elements.set("presenterOnly", new FakeElement("presenterOnly"));
+  elements.get("presenterOnly").checked = true;
+  elements.get("createButton").click();
+  assert.equal(socket.emitted.at(-1)[1].presenterOnly, true);
+  const state = baseState({ presenter: { id: "host", name: "配信者", connected: true }, players: [] });
+  socket.receive("roomCreated", state);
+  assert.equal(elements.get("startButton").disabled, true);
+  assert.equal(elements.get("startHint").textContent, "あと2人で開始できます");
+  assert.equal(elements.get("hostParticipationButton").textContent, "プレイヤーとして参加する");
+  elements.get("hostParticipationButton").click();
+  assert.equal(socket.emitted.at(-1)[1].presenterOnly, false);
+  state.players = [{ id: "a", name: "A", connected: true }, { id: "b", name: "B", connected: true }];
+  socket.receive("orderSelectionStarted", { ...state, status: "orderSelection", orderCards: [{ id: "one", chosenBy: null }] });
+  assert.equal(elements.get("orderCardGrid").children[0].disabled, true);
+  socket.receive("gameEnded", { ...state, status: "finished" });
+  assert.equal(elements.get("rematchButton").textContent, "再戦を開始する");
+  assert.equal(elements.get("lobbyButton").classList.contains("hidden"), false);
+});

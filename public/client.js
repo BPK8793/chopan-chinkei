@@ -57,6 +57,10 @@ function isHost() {
   return state?.hostId === socket.id;
 }
 
+function isPresenter() {
+  return state?.presenter?.id === socket.id;
+}
+
 function renderHostWatchControls() {
   const visible = Boolean(isHost() && hostWatchAccess?.roomId === state?.roomId && hostWatchAccess.watchKey);
   $("lobbyWatchControls").classList.toggle("hidden", !visible || $("roomScreen").classList.contains("hidden"));
@@ -98,6 +102,10 @@ function renderLobby() {
   orderInterval = null;
   showScreen($("roomScreen"));
   $("roomCode").textContent = state.roomId;
+  $("presenterInfo").classList.toggle("hidden", !state.presenter);
+  $("presenterInfo").textContent = state.presenter ? `配信・進行：${state.presenter.name}${state.presenter.connected ? "" : "（再接続待ち）"}` : "";
+  $("hostParticipationButton").classList.toggle("hidden", !isHost());
+  $("hostParticipationButton").textContent = isPresenter() ? "プレイヤーとして参加する" : "配信・進行のみに切り替える";
   $("playerCount").textContent = `${state.players.length} / 4人`;
   $("lobbyPlayers").replaceChildren(...state.players.map((player, index) => {
     const row = document.createElement("div");
@@ -121,7 +129,7 @@ function renderLobby() {
   $("startButton").disabled = !canStart;
   $("startButton").classList.toggle("hidden", !showStart);
   $("startHint").textContent = showStart
-    ? (canStart ? "準備ができたらスタート！" : "あと1人で開始できます")
+    ? (canStart ? "準備ができたらスタート！" : `あと${Math.max(0, 2 - state.players.filter((p) => p.connected).length)}人で開始できます`)
     : "ルーム作成者の開始を待っています";
   renderHostWatchControls();
 }
@@ -208,17 +216,17 @@ function renderOrderGame() {
   renderHostWatchControls();
 
   const selectedByMe = state.orderCards.some((card) => card.chosenBy === socket.id);
-  $("orderGameTitle").textContent = state.status === "orderResult" ? "順番決定！" : "運命の1枚を選ぼう！";
+  $("orderGameTitle").textContent = state.status === "orderResult" ? "順番決定！" : isPresenter() ? "参加者の順番を決めています" : "運命の1枚を選ぼう！";
   $("orderGameGuide").textContent = state.status === "orderResult"
     ? "この順番でゲームを開始します"
-    : selectedByMe ? "みんなが選び終わるのを待っています…" : "数字が大きい人からスタート。JOKERは最優先！";
+    : isPresenter() ? "参加者がカードを選んでいます" : selectedByMe ? "みんなが選び終わるのを待っています…" : "数字が大きい人からスタート。JOKERは最優先！";
 
   $("orderCardGrid").replaceChildren(...state.orderCards.map((card) => {
     const button = document.createElement("button");
     const owner = state.players.find((player) => player.id === card.chosenBy);
     button.type = "button";
     button.className = `order-card${card.chosenBy ? " chosen" : ""}${card.joker ? " joker" : ""}`;
-    button.disabled = state.status !== "orderSelection" || selectedByMe || Boolean(card.chosenBy);
+    button.disabled = isPresenter() || state.status !== "orderSelection" || selectedByMe || Boolean(card.chosenBy);
     if (state.status === "orderResult") {
       const value = document.createElement("strong");
       value.textContent = card.label;
@@ -297,10 +305,11 @@ function renderResults() {
     return row;
   }));
   const me = state.players.find((player) => player.id === socket.id);
-  $("rematchButton").disabled = Boolean(me?.rematch);
+  $("rematchButton").disabled = isPresenter() ? state.players.filter((p) => p.connected).length < 2 : Boolean(me?.rematch);
+  $("rematchButton").textContent = isPresenter() ? "再戦を開始する" : "もう一度遊ぶ";
   const votes = state.players.filter((player) => player.connected && player.rematch).length;
   const total = state.players.filter((player) => player.connected).length;
-  $("rematchHint").textContent = me?.rematch ? `再戦を待っています（${votes}/${total}）` : "全員が押すと再戦します";
+  $("rematchHint").textContent = me?.rematch ? `再戦を待っています（${votes}/${total}）` : isPresenter() ? "配信者の操作、または参加者全員の同意で再戦します" : "全員が押すと再戦します";
   $("lobbyButton").classList.toggle("hidden", !isHost());
 }
 
@@ -310,8 +319,8 @@ function applyState(next, eventName = "roomUpdated") {
   soundController?.handleGameEvent(eventName, next, previousState, { selfId: socket.id });
   if (eventName === "gameStarted") $("cardGrid").replaceChildren();
   state = next;
-  voiceController?.setRoom(next.roomId);
-  chatController?.setRoom(next.roomId);
+  voiceController?.setRoom(isPresenter() ? null : next.roomId);
+  chatController?.setRoom(isPresenter() ? null : next.roomId);
   if (state.status !== "waiting") {
     $("startButton").classList.add("hidden");
     $("startButton").disabled = true;
@@ -353,7 +362,8 @@ socket.on("hostWatchAccess", (access) => {
   if (state) renderHostWatchControls();
 });
 
-$("createButton").addEventListener("click", () => socket.emit("createRoom", { name: saveName() }));
+$("createButton").addEventListener("click", () => socket.emit("createRoom", { name: saveName(), presenterOnly: $("presenterOnly").checked }));
+$("hostParticipationButton").addEventListener("click", () => socket.emit("setHostParticipation", { presenterOnly: !isPresenter() }));
 $("joinButton").addEventListener("click", () => socket.emit("joinRoom", { name: saveName(), roomId: $("roomInput").value }));
 function normalizeRoomInput(event) {
   event.target.value = event.target.value.replace(/\D/g, "").slice(0, 4);

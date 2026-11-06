@@ -678,3 +678,84 @@ test("all generated chinchilla character variants are served as transparent PNGs
     }
   }
 });
+
+
+test("presenter hosts manage four players without playing or joining voice", async (t) => {
+  const game = createApplication();
+  const address = await game.start();
+  t.after(() => game.close());
+  const url = `http://127.0.0.1:${address.port}`;
+  const host = await connect(url);
+  const guests = await Promise.all(Array.from({ length: 4 }, () => connect(url)));
+  t.after(() => { host.close(); guests.forEach((guest) => guest.close()); });
+  let pending = once(host, "roomCreated");
+  host.emit("createRoom", { name: "配信者", presenterOnly: true });
+  const created = await pending;
+  assert.equal(created.players.length, 0);
+  assert.equal(created.presenter.id, host.id);
+  assert.ok(created.resumeToken);
+  pending = once(host, "errorMessage");
+  host.emit("startGame");
+  assert.match((await pending).message, /2人/);
+  const voice = await host.emitWithAck("voiceJoin", {});
+  assert.ok(voice.error);
+  for (const [index, guest] of guests.entries()) {
+    pending = once(guest, "roomJoined");
+    guest.emit("joinRoom", { name: `参加者${index}`, roomId: created.roomId });
+    await pending;
+  }
+  pending = once(host, "errorMessage");
+  host.emit("setHostParticipation", { presenterOnly: false });
+  assert.match((await pending).message, /満員/);
+  pending = once(host, "gameStarted");
+  host.emit("startGame");
+  const started = await pending;
+  assert.equal(started.players.length, 4);
+  assert.ok(!started.players.some((player) => player.id === host.id));
+  assert.notEqual(started.currentPlayerId, host.id);
+  pending = once(host, "errorMessage");
+  host.emit("flipCard", { index: 0 });
+  await pending;
+  const room = game.rooms.get(created.roomId);
+  assert.equal(room.selectedCards.length, 0);
+  room.status = "finished";
+  pending = once(host, "gameStarted");
+  host.emit("requestRematch");
+  await pending;
+  room.status = "finished";
+  pending = once(host, "roomUpdated");
+  host.emit("returnToLobby");
+  assert.equal((await pending).status, "waiting");
+  const token = created.resumeToken;
+  host.disconnect();
+  const resumedHost = await connect(url);
+  t.after(() => resumedHost.close());
+  pending = once(resumedHost, "roomResumed");
+  resumedHost.emit("resumeRoom", { roomId: created.roomId, resumeToken: token });
+  const resumed = await pending;
+  assert.equal(resumed.hostId, resumedHost.id);
+  assert.equal(resumed.presenter.id, resumedHost.id);
+});
+
+test("host can switch participation in an empty lobby and keep the room alive", async (t) => {
+  const game = createApplication();
+  const address = await game.start();
+  t.after(() => game.close());
+  const host = await connect(`http://127.0.0.1:${address.port}`);
+  t.after(() => host.close());
+  let pending = once(host, "roomCreated");
+  host.emit("createRoom", { name: "ホスト" });
+  const initialUpdate = once(host, "roomUpdated");
+  const created = await pending;
+  await initialUpdate;
+  pending = once(host, "roomUpdated");
+  host.emit("setHostParticipation", { presenterOnly: true });
+  assert.equal((await pending).players.length, 0);
+  assert.ok(game.rooms.has(created.roomId));
+  pending = once(host, "roomUpdated");
+  host.emit("setHostParticipation", { presenterOnly: false });
+  const playingHost = await pending;
+  assert.equal(playingHost.players[0].id, host.id);
+  assert.equal(playingHost.presenter, null);
+  host.emit("leaveRoom");
+});
